@@ -71,13 +71,18 @@ vector run_action() {
 }
 
 void serve_tea() {
-    bool busy = false;
-    do {
-        if ((busy = queryq(afterq)))
-            time_table();
-        if ((busy |= queryq(actionq)))
+    for (;;) {
+        if (queryq(actionq))
             run_action();
-    } while (busy);
+
+        if (queryq(afterq)) {
+            if (queryq(actionq))
+                time_table();
+            else
+                sleep_ms(q(afterq));
+        } else if (queryq(actionq) == 0)
+            break;
+    }
     printf("\nfinished @ %u ms", uptime_ms());
 }
 
