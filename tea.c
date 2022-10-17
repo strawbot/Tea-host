@@ -18,8 +18,28 @@ ms_time timeInMilliseconds(void) {
 
 Long uptime_ms() { return timeInMilliseconds() - origin; }
 
-int sleep_ms(Long tms) {
-  return usleep(tms * 1000);
+#include <errno.h>
+#include <time.h>
+
+int sleep_ms(long tms)
+{
+    struct timespec ts;
+    int ret;
+
+    if (tms < 0)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    ts.tv_sec = tms / 1000;
+    ts.tv_nsec = (tms % 1000) * 1000000;
+
+    do {
+        ret = nanosleep(&ts, &ts);
+    } while (ret && errno == EINTR);
+
+    return ret;
 }
 
 static void time_table() {
