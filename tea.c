@@ -16,7 +16,9 @@ ms_time timeInMilliseconds(void) {
 }
 
 Long uptime_ms() { return timeInMilliseconds() - origin; }
+
 Long ups = 0;
+
 void sleep_ms(Long tms) {
     struct timespec ts = {
         .tv_sec = tms / 1000,
@@ -48,7 +50,7 @@ void after(Long offset, vector action) {
 
     pushq(due, afterq);
     pushq((Cell)action, afterq);
-    printf("\nset: %u ms,  due @ %u ms", uptime_ms(), due);
+    printf("\nset: %u ms,  due @ %u ms  offset %u", uptime_ms(), due, offset);
     fflush(stdout);
 }
 
@@ -60,7 +62,7 @@ void later(vector action) {
     pushq((Cell)action, actionq);
 }
 
-void no_action() { printf("\nno action "); }
+void no_action() { print("\nno action "); }
 
 vector run_action() {
     if (queryq(actionq)) {
@@ -78,7 +80,7 @@ void serve_tea() {
 
         if (queryq(afterq)) {
             if (queryq(actionq) == 0)
-                sleep_ms(q(afterq));
+                sleep_ms(q(afterq)/10);
             time_table();
         } else if (queryq(actionq) == 0)
             break;

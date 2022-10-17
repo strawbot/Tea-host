@@ -7,7 +7,7 @@ void state_machine() {
     switch(state) {
     case START:
         state = MIDDLE;
-        after(msec(2204), state_machine);
+        after(msec(2065), state_machine);
         print("\nStart");
         break;
     case MIDDLE:
@@ -16,6 +16,7 @@ void state_machine() {
         print("\nMiddle");
         break;
     case END:
+        after(msec(1000), state_machine);
         state = START;
         print("\nEnd");
         break;
