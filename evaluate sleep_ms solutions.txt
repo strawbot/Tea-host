@@ -1,0 +1,4 @@
+evaluate sleep_ms solutions:
+                select  nanosleep   usleep    spin loop
+finished time    6363      6360       6368       6553
+slip time           3         3          5          0

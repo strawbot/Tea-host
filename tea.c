@@ -2,7 +2,6 @@
 #include "tea.h"
 #include "printer.h"
 #include "queue.c"
-#include <unistd.h>
 
 static QUEUE(10, afterq);
 static QUEUE(10, actionq);
@@ -17,20 +16,13 @@ ms_time timeInMilliseconds(void) {
 }
 
 Long uptime_ms() { return timeInMilliseconds() - origin; }
-
-#include <errno.h>
-#include <time.h>
-
+Long ups = 0;
 void sleep_ms(Long tms) {
-    struct timespec ts;
-    int ret;
-
-    ts.tv_sec = tms / 1000;
-    ts.tv_nsec = (tms % 1000) * 1000000;
-
-    do {
-        ret = nanosleep(&ts, &ts);
-    } while (ret && errno == EINTR);
+    struct timespec ts = {
+        .tv_sec = tms / 1000,
+        .tv_nsec = (tms % 1000) * 1000000
+    };
+    while (nanosleep(&ts, &ts)) ups++;
 }
 
 static void time_table() {
@@ -91,7 +83,7 @@ void serve_tea() {
         } else if (queryq(actionq) == 0)
             break;
     }
-    printf("\nfinished @ %u ms", uptime_ms());
+    printf("\nfinished @ %u ms  ups: %u", uptime_ms(), ups);
 }
 
 void init_tea() {
