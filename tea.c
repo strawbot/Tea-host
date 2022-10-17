@@ -22,7 +22,15 @@ Long uptime_ms() { return timeInMilliseconds() - origin; }
 #include <time.h>
 
 void sleep_ms(Long tms) {
-    usleep(tms * 1000);
+    struct timespec ts;
+    int ret;
+
+    ts.tv_sec = tms / 1000;
+    ts.tv_nsec = (tms % 1000) * 1000000;
+
+    do {
+        ret = nanosleep(&ts, &ts);
+    } while (ret && errno == EINTR);
 }
 
 static void time_table() {
