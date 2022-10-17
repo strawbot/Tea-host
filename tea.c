@@ -17,6 +17,13 @@ ms_time timeInMilliseconds(void) {
 
 Long uptime_ms() { return timeInMilliseconds() - origin; }
 
+void sleep_ms(Long tms) {
+    struct timeval tv;
+    tv.tv_sec  = tms / 1000;
+    tv.tv_usec = (tms % 1000) * 1000;
+    select (0, NULL, NULL, NULL, &tv);
+}
+
 static void time_table() {
     Byte n = queryq(afterq) / 2;
 
@@ -33,9 +40,6 @@ static void time_table() {
             pushq((Cell)action, afterq);
         }
     }
-
-    if (n || queryq(actionq))
-        later(time_table);
 }
 
 void after(Long offset, vector action) {
@@ -67,7 +71,13 @@ vector run_action() {
 }
 
 void serve_tea() {
-    while (run_action());
+    bool busy = false;
+    do {
+        if ((busy = queryq(afterq)))
+            time_table();
+        if ((busy |= queryq(actionq)))
+            run_action();
+    } while (busy);
     printf("\nfinished @ %u ms", uptime_ms());
 }
 
