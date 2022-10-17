@@ -21,25 +21,11 @@ Long uptime_ms() { return timeInMilliseconds() - origin; }
 #include <errno.h>
 #include <time.h>
 
-int sleep_ms(long tms)
-{
-    struct timespec ts;
-    int ret;
-
-    if (tms < 0)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-
-    ts.tv_sec = tms / 1000;
-    ts.tv_nsec = (tms % 1000) * 1000000;
-
-    do {
-        ret = nanosleep(&ts, &ts);
-    } while (ret && errno == EINTR);
-
-    return ret;
+void sleep_ms(Long tms) {
+    Long due = uptime_ms() + tms;
+    printf("\nnow @  %u ms, sleep to: %u ms", uptime_ms(), due);
+    fflush(stdout);
+    while (uptime_ms() < due) ;
 }
 
 static void time_table() {
@@ -51,7 +37,7 @@ static void time_table() {
 
         if (uptime_ms() >= due) {
             later(action);
-            printf("\nrun: %u",(Long)uptime_ms());
+            printf("\nrun: %ul",(Long)uptime_ms());
             fflush(stdout);
         } else {
             pushq(due, afterq);
@@ -94,10 +80,9 @@ void serve_tea() {
             run_action();
 
         if (queryq(afterq)) {
-            if (queryq(actionq))
-                time_table();
-            else
+            if (queryq(actionq) == 0)
                 sleep_ms(q(afterq));
+            time_table();
         } else if (queryq(actionq) == 0)
             break;
     }
@@ -106,5 +91,4 @@ void serve_tea() {
 
 void init_tea() {
     origin = timeInMilliseconds();
-    later(time_table);
 }
