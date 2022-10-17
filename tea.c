@@ -2,6 +2,7 @@
 #include "tea.h"
 #include "printer.h"
 #include "queue.c"
+#include <unistd.h>
 
 static QUEUE(10, afterq);
 static QUEUE(10, actionq);
@@ -17,11 +18,8 @@ ms_time timeInMilliseconds(void) {
 
 Long uptime_ms() { return timeInMilliseconds() - origin; }
 
-void sleep_ms(Long tms) {
-    struct timeval tv;
-    tv.tv_sec  = tms / 1000;
-    tv.tv_usec = (tms % 1000) * 1000;
-    select (0, NULL, NULL, NULL, &tv);
+int sleep_ms(Long tms) {
+  return usleep(tms * 1000);
 }
 
 static void time_table() {
