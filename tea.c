@@ -15,7 +15,7 @@ static void time_table() {
 
         if (time(NULL) >= due) {
             later(action);
-            printf("\nnow: %u",(Long)time(NULL));
+            printf("\nrun: %u",(Long)time(NULL));
             fflush(stdout);
         } else {
             pushq(due, afterq);
@@ -23,7 +23,7 @@ static void time_table() {
         }
     }
 
-    if (n)
+    if (n || queryq(actionq))
         later(time_table);
 }
 
@@ -32,7 +32,7 @@ void after(Long offset, vector action) {
 
     pushq(due, afterq);
     pushq((Cell)action, afterq);
-    printf("\nnow: %u,  due: %u",time(NULL), due);
+    printf("\nset: %u,  due: %u",time(NULL), due);
     fflush(stdout);
 }
 

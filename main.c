@@ -25,7 +25,7 @@ void state_machine() {
 void init() {
     print("\ninit");
     init_tea();
-    after(secs(2), state_machine);
+    later(state_machine);
 }
 
 int main() {
