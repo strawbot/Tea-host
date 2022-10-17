@@ -7,12 +7,12 @@ void state_machine() {
     switch(state) {
     case START:
         state = MIDDLE;
-        after(secs(2), state_machine);
+        after(msec(2204), state_machine);
         print("\nStart");
         break;
     case MIDDLE:
         state = END;
-        after(secs(2), state_machine);
+        after(msec(1945), state_machine);
         print("\nMiddle");
         break;
     case END:
@@ -22,14 +22,14 @@ void state_machine() {
     }
 }
 
-void init() {
+void init_app() {
     print("\ninit");
-    init_tea();
     later(state_machine);
 }
 
 int main() {
-    init();
+    init_tea();
+    init_app();
     serve_tea();
     return 0;
 }

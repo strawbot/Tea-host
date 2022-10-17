@@ -1,7 +1,11 @@
 #include "queue.h"
-#include "time.h"
+#include "sys/time.h"
 
-#define secs(n) n
+typedef long long ms_time;
+
+#define mins(n) (60*secs(n))
+#define secs(n) (1000*msec(n))
+#define msec(n) (n)
 
 typedef vector Event[1];
 void after(Long offset, vector action);

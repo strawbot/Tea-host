@@ -1,10 +1,21 @@
 // TEA
 #include "tea.h"
+#include "printer.h"
 #include "queue.c"
-#include <stdio.h>
 
 static QUEUE(10, afterq);
 static QUEUE(10, actionq);
+
+static ms_time origin;
+
+ms_time timeInMilliseconds(void) {
+    struct timeval tv;
+
+    gettimeofday(&tv,NULL);
+    return (((ms_time)tv.tv_sec)*1000)+(tv.tv_usec/1000);
+}
+
+Long uptime_ms() { return timeInMilliseconds() - origin; }
 
 static void time_table() {
     Byte n = queryq(afterq) / 2;
@@ -13,9 +24,9 @@ static void time_table() {
         Long due = pullq(afterq);
         vector action = (vector)pullq(afterq);
 
-        if (time(NULL) >= due) {
+        if (uptime_ms() >= due) {
             later(action);
-            printf("\nrun: %u",(Long)time(NULL));
+            printf("\nrun: %u",(Long)uptime_ms());
             fflush(stdout);
         } else {
             pushq(due, afterq);
@@ -28,11 +39,11 @@ static void time_table() {
 }
 
 void after(Long offset, vector action) {
-    Long due = time(NULL) + offset;
+    Long due = uptime_ms() + offset;
 
     pushq(due, afterq);
     pushq((Cell)action, afterq);
-    printf("\nset: %u,  due: %u",time(NULL), due);
+    printf("\nset: %u ms,  due @ %u ms", uptime_ms(), due);
     fflush(stdout);
 }
 
@@ -57,10 +68,10 @@ vector run_action() {
 
 void serve_tea() {
     while (run_action());
+    printf("\nfinished @ %u ms", uptime_ms());
 }
 
 void init_tea() {
+    origin = timeInMilliseconds();
     later(time_table);
 }
-
-void print(char * string) { printf(string); fflush(stdout); }
