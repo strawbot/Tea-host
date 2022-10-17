@@ -22,10 +22,7 @@ Long uptime_ms() { return timeInMilliseconds() - origin; }
 #include <time.h>
 
 void sleep_ms(Long tms) {
-    Long due = uptime_ms() + tms;
-    printf("\nnow @  %u ms, sleep to: %u ms", uptime_ms(), due);
-    fflush(stdout);
-    while (uptime_ms() < due) ;
+    usleep(tms * 1000);
 }
 
 static void time_table() {
@@ -37,7 +34,7 @@ static void time_table() {
 
         if (uptime_ms() >= due) {
             later(action);
-            printf("\nrun: %ul",(Long)uptime_ms());
+            printf("\nrun: %u",(Long)uptime_ms());
             fflush(stdout);
         } else {
             pushq(due, afterq);
