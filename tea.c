@@ -24,6 +24,7 @@ void sleep_ms(Long tms) {
         .tv_sec = tms / 1000,
         .tv_nsec = (tms % 1000) * 1000000
     };
+    printf("\nnow @  %u ms  sleep for %u ms", uptime_ms(), tms);
     while (nanosleep(&ts, &ts)) ups++;
 }
 
@@ -80,7 +81,7 @@ void serve_tea() {
 
         if (queryq(afterq)) {
             if (queryq(actionq) == 0)
-                sleep_ms(q(afterq)/10);
+                sleep_ms((q(afterq) - uptime_ms()));
             time_table();
         } else if (queryq(actionq) == 0)
             break;
