@@ -34,10 +34,17 @@ static void time_table() {
     for (Byte i = 0; i < n; i++) {
         Long due = pullq(afterq);
         vector action = (vector)pullq(afterq);
-
-        if (uptime_ms() >= due) {
+        Long now = uptime_ms();
+        Long delay = now - due;
+        if (now >= due) {
+            static Long maxdelay = 0;
+            static Long mindelay = 1000;
+            static Long avg = 0;
+            if (delay > maxdelay)  maxdelay = delay;
+            if (delay < mindelay)  mindelay = delay;
+            avg = (3*avg+delay)/4;
             later(action);
-            printf("\nrun: %u",(Long)uptime_ms());
+            printf("\nrun: %u  delay %u ms  min %u  max %u  avg %u", now, delay, mindelay, maxdelay, avg);
             fflush(stdout);
         } else {
             pushq(due, afterq);
