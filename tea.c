@@ -3,10 +3,13 @@
 #include "printer.h"
 #include "queue.c"
 
-static QUEUE(10, afterq);
-static QUEUE(10, actionq);
+static QUEUE(20, afterq); // {due, action}*
+static QUEUE(10, laterq); // {action}*
+
+static bool debug = false;
 
 static ms_time origin;
+static Long ups = 0;
 
 ms_time timeInMilliseconds(void) {
     struct timeval tv;
@@ -17,48 +20,53 @@ ms_time timeInMilliseconds(void) {
 
 Long uptime_ms() { return timeInMilliseconds() - origin; }
 
-Long ups = 0;
-
 void sleep_ms(Long tms) {
     struct timespec ts = {
         .tv_sec = tms / 1000,
         .tv_nsec = (tms % 1000) * 1000000
     };
-    printf("\nnow @  %u ms  sleep for %u ms", uptime_ms(), tms);
+    if (debug) printf("\nnow @  %lu ms  sleep for %lu ms", uptime_ms(), tms);
     while (nanosleep(&ts, &ts)) ups++;
 }
 
-static void time_table() {
-    Byte n = queryq(afterq) / 2;
+static void keep_stats(Long now, Long due) {
+    static Long maxdelay = 0;
+    static Long mindelay = 1000;
+    static Long avg = 0;
+    Long delay = now - due;
+    if (delay > maxdelay)  maxdelay = delay;
+    if (delay < mindelay)  mindelay = delay;
+    avg = (3*avg+delay)/4;
+    if (debug) printf("\nrun: %lu  delay %lu ms  min %lu  max %lu  avg %lu", now, delay, mindelay, maxdelay, avg);
+    fflush(stdout);
+}
 
-    for (Byte i = 0; i < n; i++) {
-        Long due = pullq(afterq);
-        vector action = (vector)pullq(afterq);
-        Long now = uptime_ms();
-        Long delay = now - due;
-        if (now >= due) {
-            static Long maxdelay = 0;
-            static Long mindelay = 1000;
-            static Long avg = 0;
-            if (delay > maxdelay)  maxdelay = delay;
-            if (delay < mindelay)  mindelay = delay;
-            avg = (3*avg+delay)/4;
-            later(action);
-            printf("\nrun: %u  delay %u ms  min %u  max %u  avg %u", now, delay, mindelay, maxdelay, avg);
-            fflush(stdout);
-        } else {
-            pushq(due, afterq);
-            pushq((Cell)action, afterq);
+static void time_table() {
+    Long now = uptime_ms();
+    for (Byte n = queryq(afterq) / 2; n--;) {
+        if (q(afterq) <= now) {
+            keep_stats(now, pullq(afterq));
+            later((vector)pullq(afterq));
         }
     }
 }
 
-void after(Long offset, vector action) {
+void after(Long offset, vector action) { // due soonest at front of queue; latest at end of queue
     Long due = uptime_ms() + offset;
+    Byte n = queryq(afterq) / 2;
 
+    for (; n; n--) // linear search for insertion point
+        if (due < q(afterq))
+            break;
+        else
+            rotateq(afterq, 2);
+    
     pushq(due, afterq);
     pushq((Cell)action, afterq);
-    printf("\nset: %u ms,  due @ %u ms  offset %u", uptime_ms(), due, offset);
+
+    rotateq(afterq, n * 2);
+
+    if (debug) printf("\nset: %lu ms,  due @ %lu ms  offset %lu  dues: %lu", uptime_ms(), due, offset, queryq(afterq)/2);
     fflush(stdout);
 }
 
@@ -67,33 +75,51 @@ void when(Event event, vector action) {
 }
 
 void later(vector action) {
-    pushq((Cell)action, actionq);
+    pushq((Cell)action, laterq);
 }
 
-void no_action() { print("\nno action "); }
+void no_action() { if (debug) print("\nno action "); }
 
 vector run_action() {
-    if (queryq(actionq)) {
-        vector action = (vector)pullq(actionq);
+    if (queryq(laterq)) {
+        vector action = (vector)pullq(laterq);
         action();
         return action;
     }
     return NULL;
 }
 
+void stop(vector action) {
+    for (Byte l = queryq(laterq); l--;)
+        if ((vector)q(laterq) == action)
+            pullq(laterq);
+        else
+            rotateq(laterq, 1);
+    
+    for (Byte a = queryq(afterq)/2; a--;) {
+        Cell due = pullq(afterq);
+        if ((vector)q(afterq) == action)
+            pullq(afterq);
+        else {
+            pushq(due, afterq);
+            rotateq(afterq, 1);
+        }
+    }
+}
+
 void serve_tea() {
     for (;;) {
-        if (queryq(actionq))
+        if (queryq(laterq))
             run_action();
 
         if (queryq(afterq)) {
-            if (queryq(actionq) == 0)
+            if (queryq(laterq) == 0)
                 sleep_ms((q(afterq) - uptime_ms()));
             time_table();
-        } else if (queryq(actionq) == 0)
+        } else if (queryq(laterq) == 0)
             break;
     }
-    printf("\nfinished @ %u ms  ups: %u", uptime_ms(), ups);
+    printf("\nfinished @ %lu ms  ups: %lu", uptime_ms(), ups);
 }
 
 void init_tea() {
