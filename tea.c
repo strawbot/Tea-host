@@ -3,8 +3,8 @@
 #include "printer.h"
 #include "queue.c"
 
-static QUEUE(20, afterq); // {due, action}*
-static QUEUE(10, laterq); // {action}*
+static QUEUE(10, afterq); // {due, action}*
+static QUEUE(5, laterq); // {action}*
 
 static bool debug = false;
 
