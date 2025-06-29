@@ -15,5 +15,3 @@ void later(vector action);
 void stop(vector action);
 
 void init_tea();
-
-void print(char * string);

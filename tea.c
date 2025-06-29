@@ -1,7 +1,8 @@
 // TEA
 #include "tea.h"
-#include "printer.h"
+#include "printers.h"
 #include "queue.c"
+#include <stdio.h>
 
 static QUEUE(10, afterq); // {due, action}*
 static QUEUE(5, laterq); // {action}*
