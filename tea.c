@@ -119,7 +119,7 @@ void serve_tea() {
         } else if (queryq(laterq) == 0)
             break;
     }
-    printf("\nfinished @ %lu ms  ups: %lu", uptime_ms(), ups);
+    printf("\nfinished @ %lu ms  ups: %lu\n", uptime_ms(), ups);
 }
 
 void init_tea() {

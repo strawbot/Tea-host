@@ -36,7 +36,7 @@ void init_app() {
     print("\ninit");
     later(state_machine);
     when(happen, announce);
-    after(secs(20), stop_state_machine);
+    after(secs(10), stop_state_machine);
 }
 
 int main() {
