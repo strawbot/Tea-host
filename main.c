@@ -87,6 +87,14 @@ static void get_frame_sync(Byte * frame, Short start) {
             index += n;
         one = !one;
     }
+    if (memcmp(f_sync[0], pdu + BSYNC_SIZE, FSYNC_SIZE) == 0)
+        print(" FEC Mode 0 ");
+    else if (memcmp(f_sync[1], pdu + BSYNC_SIZE, FSYNC_SIZE) == 0)
+        print(" FEC Mode 1 ");
+    else if (memcmp(f_sync[2], pdu + BSYNC_SIZE, FSYNC_SIZE) == 0)
+        print(" FEC Mode 2 ");
+    else
+        print(" Unknown FEC mode or bit error ");
     print("\nPDU: "), hbytes(pdu, sizeof(pdu));
 }
 
