@@ -19,6 +19,8 @@ encoded:  EB 90 B4 33 AA AA 35 2E F8 53 0D C5 D4 2F AE 54 25 9D 9E 93 F6 6F 78 E
 #define FS_MODE1 0x58, 0x98, 0x23, 0x3E
 #define FS_MODE2 0xEE, 0x43, 0x4E, 0x88
 
+Byte * payload;
+
 static Byte f_sync[][FSYNC_SIZE] = {{FS_MODE0}, {FS_MODE1}, {FS_MODE2}};
 static Byte bit_sync[BSYNC_SIZE] = {BIT_SYNC};
 
@@ -26,15 +28,19 @@ static Byte bit_sync_bits[1000];
 
 static Byte test_frame[] = {
     0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, // preamble
-    0xEB, 0x90, 0xB4, 0x33, 0xAA, 0xAA, // bit sync
-    0x35, 0x2E, 0xF8, 0x53, // frame sync
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 250, 251, 252, 253, 254, 255,
+    0xEB, 0x90, 0xB4, 0x33, 0xAA, 0xAA, 0x35, 0x2E, 0xF8, 0x53, 0x0D, 0xC5, 0xD4, 0x2F, 0xAE, 0x54, 0x25, 0x9D, 0x9E, 0x93, 0xF6, 0x6F,
+    0x78, 0xE6, 0x16, 0xCD, 0xBA, 0x69, 0xAC, 0x67, 0x78, 0xA3, 0xAB, 0xC5, 0xB4, 0x73, 0x1F, 0x90, 0x02, 0x6A, 0x7D, 0xB9, 0xC4, 0xB3,
+    0x00, 0xA3, 0x31, 0x6E, 0x85, 0xBD, 0x0B, 0x45, 0x84, 0x4D, 0x44, 0xF1, 0x94, 0x71, 0x4C, 0x9C, 0x97, 0x57, 0x71, 0xD8, 0x5F, 0x86,
+    0x47, 0x6B, 0x40, 0x18, 0xC5, 0x14, 0xEC, 0x28, 0xC2, 0x07, 0xE9, 0xF1, 0x1C, 0x16, 0x7C, 0xAC, 0x93, 0x3B, 0x69, 0x10, 0xB9, 0x4C,
+    0xE0, 0x8A, 0x39, 0xC0,
 };
 
 static Byte test_frame_bits[sizeof(test_frame) * 8];
 
+// on STM32L4R5 use bit banding to read/write bits directly: SRAM1
 static bool get_bit(Byte * p, Short bit) { return 1 & ( p[bit/8] >> (7 - bit%8) ); }
 static void set_bit(Byte * p, Short bit) { p[bit/8] |= 1 << (7 - bit%8); }
+static void set_bits(Byte * p, Short index, Short n) { while (n--)  set_bit(p, index++); }
 
 static void frame_bits(Byte * frame, Short n, Byte * bit_sync_bits) { // turn hex byte frame into bit sequences
     bool first = get_bit(frame, 0);
@@ -79,28 +85,30 @@ static Short match_bit_seqs(Byte * sync, Byte * frame) {
 static void get_frame_sync(Byte * frame, Short start) {
     Byte * fp = frame + start;
     Short n = 0;
-    while (*fp)
-        n += *fp++;
+    while (*fp) n += *fp++; // count bits
 
-    Byte pdu[n/8 + 1];
+    Byte pdu[n/8 + 1]; // add extra byte for any over bits
+    Short index = 0;
+
     memset(pdu, 0, sizeof(pdu));
     fp = frame + start;
-    Short index = 0;
-    bool one = true;
-    while (*fp) {
-        Byte n = *fp++;
-        if (one)
-            while (n--)
-                set_bit(pdu, index++);
-        else
+    for (;;) {
+        if ((n = *fp++)) {
+            set_bits(pdu, index, n);   // write one's
             index += n;
-        one = !one;
+            if ((index += *fp++) == 0) // skip zero's
+                break;
+        }
+        else
+            break;
     }
-    if (memcmp(f_sync[0], pdu + BSYNC_SIZE, FSYNC_SIZE) == 0)
+
+    Byte * fec = pdu + BSYNC_SIZE;
+    if      (memcmp(f_sync[0], fec, FSYNC_SIZE) == 0)
         print(" FEC Mode 0 ");
-    else if (memcmp(f_sync[1], pdu + BSYNC_SIZE, FSYNC_SIZE) == 0)
+    else if (memcmp(f_sync[1], fec, FSYNC_SIZE) == 0)
         print(" FEC Mode 1 ");
-    else if (memcmp(f_sync[2], pdu + BSYNC_SIZE, FSYNC_SIZE) == 0)
+    else if (memcmp(f_sync[2], fec, FSYNC_SIZE) == 0)
         print(" FEC Mode 2 ");
     else
         print(" Unknown FEC mode or bit error ");
