@@ -15,3 +15,4 @@ void later(vector action);
 void stop(vector action);
 
 void init_tea();
+void serve_tea();
