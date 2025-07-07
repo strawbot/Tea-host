@@ -11,6 +11,8 @@ encoded:  EB 90 B4 33 AA AA 35 2E F8 53 0D C5 D4 2F AE 54 25 9D 9E 93 F6 6F 78 E
 #include "tea.h"
 #include "printers.h"
 #include <string.h>
+#include "correct.h"
+#include "encode.h"
 
 #define BSYNC_SIZE 6
 #define FSYNC_SIZE 4
@@ -19,6 +21,61 @@ encoded:  EB 90 B4 33 AA AA 35 2E F8 53 0D C5 D4 2F AE 54 25 9D 9E 93 F6 6F 78 E
 #define FS_MODE1 0x58, 0x98, 0x23, 0x3E
 #define FS_MODE2 0xEE, 0x43, 0x4E, 0x88
 
+// encoding:
+// FEC mode     0       1       2
+// poly's       5B 79   1EB 171 1EB 171
+// window       7       9       9
+// code puncher 1/1     2/3     3/4
+
+static Byte alpdu[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC, 0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
+static Byte convolved[sizeof(alpdu)*2 + 2];
+static Short nbytes;
+
+#define V27POLYA 0x6D  //  8bitreversed: 0xDA; inverted: (0xFF&~0x5B); reversedinverted: (0xFF&~0xDA); shifted (0x5B << 2)
+#define V27POLYB 0x4F  //  8bitreversed: 0x9E; inverted: (0xFF&~0x79); reversedinverted: (0xFF&~0x9E); shifted (0x79 << 2)
+
+static void encode() {
+    // memset(alpdu, 0, sizeof(alpdu));
+
+    // alpdu[0] = 0x80;
+
+    print("\nALPDU: "), printDec(sizeof(alpdu)), hbytes(alpdu, sizeof(alpdu));
+    nbytes = convolve_bytes(alpdu, convolved, sizeof(alpdu));
+    print("\nConvolved: "), printDec(nbytes);
+    hbytes(convolved, nbytes);
+    print("\nSearching for Poly's");
+
+    for (Short a = 0; a < 128; a++)
+        for (Short b = 0; b < 128; b++) {
+            Short * poly = (Short[]){a, b};
+            correct_convolutional * conv = correct_convolutional_create(2, 7, poly);
+            Byte convolved2[sizeof(alpdu)*2 + 2];
+            Short n = correct_convolutional_encode(conv, alpdu, sizeof(alpdu), convolved2)/8;
+            if (memcmp(convolved, convolved2, n) == 0) {
+                print("\nmatch with: "), printHex2(a), printHex2(b), printCr(), hbytes(convolved, n), printCr(), hbytes(convolved2, n);
+                break;
+            }
+        }
+}
+
+// decoding
+static void decode() {
+    Short * poly = (Short[]){V27POLYA, V27POLYB};
+    correct_convolutional * conv = correct_convolutional_create(2, 7, poly);
+
+    // print("\nCode with libcorrect: ");
+    // memset(convolved, 0, sizeof(convolved));
+    // printDec(correct_convolutional_encode(conv, alpdu, sizeof(alpdu), convolved)/8);
+
+    Byte decoded[1000];
+    int n = correct_convolutional_decode(conv, convolved, nbytes*8, decoded);
+    print("\nDecod: ");
+    printDec(n);
+    if (n > 0)
+        hbytes(decoded, n);
+}
+
+// framing
 Byte * payload;
 
 static Byte f_sync[][FSYNC_SIZE] = {{FS_MODE0}, {FS_MODE1}, {FS_MODE2}};
@@ -127,7 +184,10 @@ static void print_results() {
     }
 }
 
+// test
 void init_app() {
-    later(build_bit_seqs);
-    later(print_results);
+    // later(build_bit_seqs);
+    // later(print_results);
+    later(encode);
+    later(decode);
 }
