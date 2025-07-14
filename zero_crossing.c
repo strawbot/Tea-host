@@ -11,8 +11,15 @@ encoded:  EB 90 B4 33 AA AA 35 2E F8 53 0D C5 D4 2F AE 54 25 9D 9E 93 F6 6F 78 E
 #include "tea.h"
 #include "printers.h"
 #include <string.h>
+#include <limits.h>
+#include "correct/convolutional/convolutional.h"
 #include "correct.h"
 #include "encode.h"
+
+void create_reverse_table();
+
+// typedef Short distance_t;
+// static const distance_t distance_max = UINT16_MAX;
 
 #define BSYNC_SIZE 6
 #define FSYNC_SIZE 4
@@ -35,10 +42,6 @@ static Short nbytes;
 #define V27POLYB 0x4F  // 0x79 but 7 lower bits reversed
 
 static void encode() {
-    // memset(alpdu, 0, sizeof(alpdu));
-
-    // alpdu[0] = 0x80;
-
     print("\nALPDU: "), printDec(sizeof(alpdu)), hbytes(alpdu, sizeof(alpdu));
     nbytes = convolve_bytes(alpdu, convolved, sizeof(alpdu));
     print("\nConvo: "), printDec(nbytes);
@@ -46,16 +49,111 @@ static void encode() {
 }
 
 // decoding
+// table has numstates rows
+// each row contains all of the polynomial output bits concatenated together
+// e.g. for rate 2, we have 2 bits in each row
+// the first poly gets the LEAST significant bit, last poly gets most significant
+void fill_table_static(unsigned int rate, unsigned int order, const polynomial_t *poly,
+                unsigned int *table) {
+    for (shift_register_t i = 0; i < 1 << order; i++) {
+        unsigned int out = 0;
+        unsigned int mask = 1;
+        for (size_t j = 0; j < rate; j++) {
+            out |= (popcount(i & poly[j]) % 2) ? mask : 0;
+            mask <<= 1;
+        }
+        table[i] = out;
+    }
+}
+
+error_buffer_t *error_buffer_create_static(unsigned int num_states) {
+    static error_buffer_t eb;
+    error_buffer_t *buf = &eb;
+
+    // how large are the error buffers?
+    buf->num_states = num_states;
+
+    // save two error metrics, one for last round and one for this
+    // (double buffer)
+    // the error metric is the aggregated number of bit errors found
+    //   at a given path which terminates at a particular shift register state
+    static distance_t be1[1<<7],  be2[sizeof(be1)];
+    memset(be1, 0, sizeof(be1));
+    memset(be2, 0, sizeof(be2));
+    buf->errors[0] = be1;
+    buf->errors[1] = be2;
+
+    // which buffer are we using, 0 or 1?
+    buf->index = 0;
+
+    buf->read_errors = buf->errors[0];
+    buf->write_errors = buf->errors[1];
+
+    return buf;
+}
+
+correct_convolutional *correct_convolutional_create_static(size_t rate, size_t order,
+                                                    const polynomial_t *poly) {
+    static correct_convolutional c;
+    memset(&c, 0, sizeof(c));
+    correct_convolutional * conv = &c;
+
+    if (order > 8 * sizeof(shift_register_t)) {
+        // XXX turn this into an error code
+        print("order must be smaller than 8 * sizeof(shift_register_t)\n");
+        return NULL;
+    }
+    if (rate < 2) {
+        // XXX turn this into an error code
+        print("rate must be 2 or greater\n");
+        return NULL;
+    }
+
+    conv->order = order;
+    conv->rate = rate;
+    conv->numstates = 1 << order;
+
+    static unsigned int t[1 << 9];
+    unsigned int *table = t;
+    fill_table_static(conv->rate, conv->order, poly, table);
+    *(unsigned int **)&conv->table = table;
+
+    static bit_writer_t bw;
+    static bit_reader_t br;
+    conv->bit_writer = &bw;
+    conv->bit_reader = &br;
+
+    conv->has_init_decode = true;
+
+    static Byte d[(1 << (2)) * sizeof(distance_t)];
+
+    conv->distances = (void *)d;
+    conv->pair_lookup = pair_lookup_create(conv->rate, conv->order, conv->table);
+
+    conv->soft_measurement = CORRECT_SOFT_LINEAR;
+
+    uint64_t max_error_per_input = conv->rate * soft_max;
+    unsigned int renormalize_interval = distance_max / max_error_per_input;
+
+    // we limit history to go back as far as 5 * the order of our polynomial
+    conv->history_buffer = history_buffer_create(5 * conv->order, 15 * conv->order, renormalize_interval,
+                                                 conv->numstates / 2, 1 << (conv->order - 1));
+
+    conv->errors = error_buffer_create_static(conv->numstates);
+
+    return &c;
+}
+
 static void decode() {
     Short * poly = (Short[]){V27POLYA, V27POLYB};
-    correct_convolutional * conv = correct_convolutional_create(2, 7, poly);
+    correct_convolutional * conv = correct_convolutional_create_static(2, 7, poly);
 
     Byte decoded[1000];
     int n = correct_convolutional_decode(conv, convolved, nbytes*8, decoded);
     print("\nDecod: ");
     printDec(n);
     if (n > 0)
-        hbytes(decoded, n);
+        hbytes(decoded, min(n,100));
 }
 
 // framing
@@ -75,7 +173,9 @@ static Byte test_frame[] = {
     0xE0, 0x8A, 0x39, 0xC0,
 };
 
-static Byte test_frame_bits[sizeof(test_frame) * 8];
+Byte test_frame_bits[5000];
+
+void clear_test_frame() { memset(test_frame_bits, 0, sizeof(test_frame_bits)); }
 
 // on STM32L4R5 use bit banding to read/write bits directly: SRAM1
 static bool get_bit(Byte * p, Short bit) { return 1 & ( p[bit/8] >> (7 - bit%8) ); }
@@ -106,6 +206,7 @@ static void build_bit_seqs() {
 // last bit might be 1 or more so it will match if equal to or > 
 // in the case the last bit is 1, it will always match except for end of string
 static Short match_bit_seqs(Byte * sync, Byte * frame) {
+	Short longest = 0;
     Byte * mp = sync;  // match pointer
     Byte * sp = frame; // search pointer
     while (*sp && *mp) // end of either
@@ -113,8 +214,10 @@ static Short match_bit_seqs(Byte * sync, Byte * frame) {
             if (*mp == 0 && mp[-1] <= sp[-1]) // check last match
                 break;
             sp = sp - (mp - sync) + 1; // back to start of search plus 1
+            longest = max(longest, mp - sync);
             mp = sync;
         }
+    print("\nLongest match:"), printDec(longest);
     if (*mp == 0) { // check if match pointer complete
         sp -= strlen((char *)sync);
         return sp - frame;
@@ -126,6 +229,11 @@ static void get_frame_sync(Byte * frame, Short start) {
     Byte * fp = frame + start;
     Short n = 0;
     while (*fp) n += *fp++; // count bits
+
+    if (n < FSYNC_SIZE * 8) {
+    	print("\nNot enuf bits.");
+    	return;
+    }
 
     Byte pdu[n/8 + 1]; // add extra byte for any over bits
     Short index = 0;
@@ -155,7 +263,7 @@ static void get_frame_sync(Byte * frame, Short start) {
     print("\nPDU: "), hbytes(pdu, sizeof(pdu));
 }
 
-static void print_results() {
+void print_results() {
     Short index = match_bit_seqs(bit_sync_bits, test_frame_bits);
     Short tlen = strlen((char*)test_frame_bits);
     if (index == tlen)
@@ -167,10 +275,14 @@ static void print_results() {
     }
 }
 
+/*
+1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 2 1 3 2 1 3 3 1 1 1 1 1 1 1 3 1 1 2 2 3 2 1 2 3 2 2 2 1 3 2 2 1 1 2 2 2 1 3 1 1 2 1 2 4 1 1 2 4 1 4 1 3 1 4 8 1 2 6 2 1 1 1 3 6 3 3 1 2 3 1 3 4 1 3 1 2 2 1 4 2 1 1 2 4 1 2 1 4 4 2 1 3 3 2 2 1 2 2 2 1 3 1 2 5 1 1 2 2 2 1 2 1 2 2 1 4 2 2 1 3 4 1 2 1 2 1 1 1 3 1 3 3 2 2 2 1 2 1 1 1 2 1 2 1 3 2 3 2 2 0 1 2 2 2 2 1 2 4 1 3 1 1 3 3 3 3 2 5 1 2 3 1 2 4 1 2 2 2 1 3 2 2 1 2 1 
+*/
 // test
-void init_app() {
-    // later(build_bit_seqs);
-    // later(print_results);
+void init_zc() {
+    later(build_bit_seqs);
+    later(print_results);
     later(encode);
     later(decode);
+    create_reverse_table();
 }
