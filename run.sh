@@ -7,6 +7,7 @@
         printersHost.c \
         zero_crossing.c \
         tea.c \
+        decode_static.c \
         ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/convolve012.c \
         ../libcorrect/src/convolutional/error_buffer.c \
         ../libcorrect/src/convolutional/lookup.c \

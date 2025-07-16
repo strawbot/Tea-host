@@ -14,9 +14,8 @@ E6 16 CD 83 CA 53 98 89 E8 13 AB F1 34 EE 4C E0 B0 EB 96 42 1F 15 7F A2 8A 12 96
 B0 72 76 D7 2C A0 9F EB D0 B7 C2 9D A7 D5 C0
 
 */
-#include "correct.h"
-#include "correct/convolutional/convolutional.h"
 #include "encode.h"
+#include "decode_static.h"
 #include "printers.h"
 #include "tea.h"
 #include <limits.h>
@@ -55,157 +54,14 @@ static void encode() {
     hbytes(convolved, nbytes);
 }
 
-// decoding
-// table has numstates rows
-// each row contains all of the polynomial output bits concatenated together
-// e.g. for rate 2, we have 2 bits in each row
-// the first poly gets the LEAST significant bit, last poly gets most
-// significant
-void fill_table_static(unsigned int rate, unsigned int order,
-                       const polynomial_t *poly, unsigned int *table) {
-    for (shift_register_t i = 0; i < 1 << order; i++) {
-        unsigned int out = 0;
-        unsigned int mask = 1;
-        for (size_t j = 0; j < rate; j++) {
-            out |= (popcount(i & poly[j]) % 2) ? mask : 0;
-            mask <<= 1;
-        }
-        table[i] = out;
-    }
-}
-
-#define MAX_ORDER 7
-#define MAX_STATES (1<<MAX_ORDER)
-
-history_buffer *history_buffer_create_static(unsigned int mtl, unsigned int tgl,
-                                             unsigned int renormalize_interval,
-                                             unsigned int num_states,
-                                             shift_register_t highbit) {
-#define min_traceback_lengthx (5 * MAX_ORDER)
-#define traceback_group_lengthx (15 * MAX_ORDER)
-#define capx (min_traceback_lengthx + traceback_group_lengthx)
-
-    static history_buffer hb;
-    memset(&hb, 0, sizeof(hb));
-    history_buffer *buf = (void*)&hb;
-    *(unsigned int *)&buf->min_traceback_length = min_traceback_lengthx;
-    *(unsigned int *)&buf->traceback_group_length = traceback_group_lengthx;
-    *(unsigned int *)&buf->cap = min_traceback_lengthx + traceback_group_lengthx;
-    *(unsigned int *)&buf->num_states = num_states;
-    *(shift_register_t *)&buf->highbit = highbit;
-
-    if (mtl != min_traceback_lengthx || tgl != traceback_group_lengthx)
-        print("\nhistory buffer error");
-
-    static Byte bh[capx * sizeof(uint8_t *)], bf[capx * sizeof(uint8_t)];
-    buf->history = (void*)bh;
-    buf->fetched = (void*)bf;
-    static Byte bhb[capx][MAX_STATES];
-    memset(bhb, 0, sizeof(bhb));
-    for (unsigned int i = 0; i < capx; i++)
-        buf->history[i] = (void *)bhb[i];
-
-    buf->index = 0;
-    buf->len = 0;
-
-    buf->renormalize_counter = 0;
-    buf->renormalize_interval = renormalize_interval;
-
-    return buf;
-}
-
-error_buffer_t *error_buffer_create_static(unsigned int num_states) {
-    static error_buffer_t eb;
-    error_buffer_t *buf = &eb;
-
-    // how large are the error buffers?
-    buf->num_states = num_states;
-
-    // save two error metrics, one for last round and one for this
-    // (double buffer)
-    // the error metric is the aggregated number of bit errors found
-    //   at a given path which terminates at a particular shift register state
-    if (num_states > MAX_STATES) {
-        print("\nError num_states is not 7: "), printDec(num_states);
-    }
-    static distance_t be1[1 << MAX_ORDER], be2[sizeof(be1)];
-    memset(be1, 0, sizeof(be1));
-    memset(be2, 0, sizeof(be2));
-    buf->errors[0] = be1;
-    buf->errors[1] = be2;
-
-    // which buffer are we using, 0 or 1?
-    buf->index = 0;
-
-    buf->read_errors = buf->errors[0];
-    buf->write_errors = buf->errors[1];
-
-    return buf;
-}
-
-correct_convolutional *
-correct_convolutional_create_static(size_t rate, size_t order,
-                                    const polynomial_t *poly) {
-    static correct_convolutional c;
-    memset(&c, 0, sizeof(c));
-    correct_convolutional *conv = &c;
-
-    if (order > 8 * sizeof(shift_register_t)) {
-        // XXX turn this into an error code
-        print("order must be smaller than 8 * sizeof(shift_register_t)\n");
-        return NULL;
-    }
-    if (rate < 2) {
-        // XXX turn this into an error code
-        print("rate must be 2 or greater\n");
-        return NULL;
-    }
-
-    conv->order = order;
-    conv->rate = rate;
-    conv->numstates = 1 << order;
-
-    static unsigned int t[1 << 9];
-    unsigned int *table = t;
-    fill_table_static(conv->rate, conv->order, poly, table);
-    *(unsigned int **)&conv->table = table;
-
-    static bit_writer_t bw;
-    static bit_reader_t br;
-    conv->bit_writer = &bw;
-    conv->bit_reader = &br;
-
-    conv->has_init_decode = true;
-
-    static Byte d[(1 << (2)) * sizeof(distance_t)];
-
-    conv->distances = (void *)d;
-    conv->pair_lookup =
-        pair_lookup_create(conv->rate, conv->order, conv->table);
-
-    conv->soft_measurement = CORRECT_SOFT_LINEAR;
-
-    uint64_t max_error_per_input = conv->rate * soft_max;
-    unsigned int renormalize_interval = distance_max / max_error_per_input;
-
-    // we limit history to go back as far as 5 * the order of our polynomial
-    conv->history_buffer = history_buffer_create_static(
-        5 * conv->order, 15 * conv->order, renormalize_interval,
-        conv->numstates / 2, 1 << (conv->order - 1));
-
-    conv->errors = error_buffer_create_static(conv->numstates);
-
-    return &c;
-}
-
 static void decode() {
     Short *poly = (Short[]){V27POLYA, V27POLYB};
     correct_convolutional *conv =
-        correct_convolutional_create_static(2, MAX_ORDER, poly);
-
-    Byte decoded[1000];
-    int n = correct_convolutional_decode(conv, convolved, nbytes * 8, decoded);
+        correct_convolutional_create_static(RATE, MAX_ORDER, poly);
     print("\nDecod: ");
+    flush();
+    Byte decoded[10000];
+    int n = correct_convolutional_decode(conv, convolved, nbytes * 8, decoded);
     printDec(n);
     if (n > 0)
         hbytes(decoded, min(n, 100));
@@ -351,8 +207,8 @@ void print_results() {
 */
 // test
 void init_zc() {
-    later(build_bit_seqs);
-    later(print_results);
+    // later(build_bit_seqs);
+    // later(print_results);
     later(encode);
     later(decode);
     create_reverse_table();
