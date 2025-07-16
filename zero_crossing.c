@@ -1,27 +1,7 @@
-/*
-transmit for FEC mode 0 17 pdu bytes in 235 ms
-alpdu:  00 00 10 0B 0B B8 34 5A E3 01 06 08 11 84 C9 11 04
-encoded:  EB 90 B4 33 AA AA 35 2E F8 53 0D C5 D4 2F AE 54 25 9D 9E 93 F6 6F 78
-E6 16 CD BA 69 AC 67 78 A3 AB C5 B4 73 1F 90 02 6A 7D B9 C4 B3 00 A3 31 6E 85 BD
-0B 45 84 4D 44 F1 94 71 4C 9C 97 57 71 D8 5F 86 47 6B 40 18 C5 14 EC 28 C2 07 E9
-F1 1C 16 7C AC 93 3B 69 10 B9 4C E0 8A 39 C0
-
-transmit for FEC mode 0 17 pdu bytes in 235 ms
-alpdu:  00 00 10 0B 0B B8 44 5A EC 01 06 08 11 84 C9 11 04
-encoded:  EB 90 B4 33 AA AA 35 2E F8 53 0D C5 D4 2F AE 54 25 9D 9E 93 F6 6F 78
-E6 16 CD 83 CA 53 98 89 E8 13 AB F1 34 EE 4C E0 B0 EB 96 42 1F 15 7F A2 8A 12 96
-81 97 E8 36 4A 7F 35 E9 D9 D0 A5 E5 EC 72 7B CE 9F 28 61 01 7B 8B 22 F2 59 06 23
-B0 72 76 D7 2C A0 9F EB D0 B7 C2 9D A7 D5 C0
-
-*/
-#include "encode.h"
-#include "decode_static.h"
 #include "printers.h"
 #include "tea.h"
 #include <limits.h>
 #include <string.h>
-
-void create_reverse_table();
 
 // typedef Short distance_t;
 // static const distance_t distance_max = UINT16_MAX;
@@ -32,40 +12,6 @@ void create_reverse_table();
 #define FS_MODE0 0x35, 0x2E, 0xF8, 0x53
 #define FS_MODE1 0x58, 0x98, 0x23, 0x3E
 #define FS_MODE2 0xEE, 0x43, 0x4E, 0x88
-
-// encoding:
-// FEC mode     0       1       2
-// poly's       5B 79   1EB 171 1EB 171
-// window       7       9       9
-// code puncher 1/1     2/3     3/4
-
-static Byte alpdu[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
-                       0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
-static Byte convolved[sizeof(alpdu) * 2 + 2];
-static Short nbytes;
-
-#define V27POLYA 0x6D // 0x5B but 7 lower bits reversed
-#define V27POLYB 0x4F // 0x79 but 7 lower bits reversed
-
-static void encode() {
-    print("\nALPDU: "), printDec(sizeof(alpdu)), hbytes(alpdu, sizeof(alpdu));
-    nbytes = convolve_bytes(alpdu, convolved, sizeof(alpdu));
-    print("\nConvo: "), printDec(nbytes);
-    hbytes(convolved, nbytes);
-}
-
-static void decode() {
-    Short *poly = (Short[]){V27POLYA, V27POLYB};
-    correct_convolutional *conv =
-        correct_convolutional_create_static(RATE, MAX_ORDER, poly);
-    print("\nDecod: ");
-    flush();
-    Byte decoded[10000];
-    int n = correct_convolutional_decode(conv, convolved, nbytes * 8, decoded);
-    printDec(n);
-    if (n > 0)
-        hbytes(decoded, min(n, 100));
-}
 
 // framing
 Byte *payload;
@@ -207,9 +153,6 @@ void print_results() {
 */
 // test
 void init_zc() {
-    // later(build_bit_seqs);
-    // later(print_results);
-    later(encode);
-    later(decode);
-    create_reverse_table();
+    later(build_bit_seqs);
+    later(print_results);
 }
