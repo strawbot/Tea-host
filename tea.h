@@ -19,3 +19,7 @@ void init_tea();
 void serve_tea();
 
 void no_action();
+
+#define sysTicks() 0
+#define SYS_TO_MS(t) 0
+#define SYS_TO_US(t) 0
