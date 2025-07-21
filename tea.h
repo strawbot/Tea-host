@@ -20,6 +20,6 @@ void serve_tea();
 
 void no_action();
 
-#define sysTicks() 0
-#define SYS_TO_MS(t) 0
-#define SYS_TO_US(t) 0
+#define sysTicks() clock()
+#define SYS_TO_MS(t) (Long)((double)(t)*1000 / CLOCKS_PER_SEC)
+#define SYS_TO_US(t) (Long)((double)(t)*1000*1000 / CLOCKS_PER_SEC)
