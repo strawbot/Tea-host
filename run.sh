@@ -4,25 +4,26 @@
     -I ../Tea-host \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/AirLink \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder \
-    -I ../libcorrect/include \
-    -I ../libcorrect/include/correct/reed-solomon \
+    -I ../AL200_Platforms/libcorrect/include \
+    -I ../AL200_Platforms/libcorrect/include/correct/reed-solomon \
     main.c \
     tea.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/printersHost.c \
     ../AL200_Platforms/AL200_OSX/Decoders/zero_crossings.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/convolve012.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/rs012.c \
     ../AL200_Platforms/AL200_OSX/Decoders/decode_static.c \
     ../AL200_Platforms/AL200_OSX/Decoders/correct_static.c \
-    ../libcorrect/src/convolutional/error_buffer.c \
-    ../libcorrect/src/convolutional/lookup.c \
-    ../libcorrect/src/convolutional/history_buffer.c \
-    ../libcorrect/src/convolutional/metric.c \
-    ../libcorrect/src/convolutional/bit.c \
-    ../libcorrect/src/convolutional/convolutional.c \
-    ../libcorrect/src/convolutional/decode.c \
-    ../libcorrect/src/reed-solomon/decode.c \
-    ../libcorrect/src/reed-solomon/polynomial.c \
-    ../libcorrect/src/reed-solomon/reed-solomon.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/error_buffer.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/lookup.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/history_buffer.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/metric.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/bit.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/convolutional.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/decode.c \
+    ../AL200_Platforms/libcorrect/src/reed-solomon/decode.c \
+    ../AL200_Platforms/libcorrect/src/reed-solomon/polynomial.c \
+    ../AL200_Platforms/libcorrect/src/reed-solomon/reed-solomon.c \
     && ls -l a.out \
     && ./a.out
 # ALPDU: 17  00 00 10 0B 0B B8 44 5A EC 01 06 08 11 84 C9 11 04

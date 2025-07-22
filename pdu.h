@@ -1,0 +1,1 @@
+enum {FEC_MODE0, FEC_MODE1, FEC_MODE2};
