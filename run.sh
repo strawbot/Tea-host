@@ -24,7 +24,6 @@
     ../AL200_Platforms/libcorrect/src/reed-solomon/decode.c \
     ../AL200_Platforms/libcorrect/src/reed-solomon/polynomial.c \
     ../AL200_Platforms/libcorrect/src/reed-solomon/reed-solomon.c \
-    && ls -l a.out \
     && ./a.out
 # ALPDU: 17  00 00 10 0B 0B B8 44 5A EC 01 06 08 11 84 C9 11 04
 # Convo: 36  00 00 00 00 03 7C B0 D1 A2 A1 73 0D 6B FC FF 65 8B 3D 27 03 7C 8A 39 1F 2F 7F 13 AB 23 3B 53 CF CC 87 CB 00
