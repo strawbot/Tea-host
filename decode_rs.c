@@ -38,7 +38,7 @@
 
 #define min(a,b) (a < b ? a : b)
 
-int decode_rs012(struct rs *rs, data_t *data, int *eras_pos) {
+int decode_rs012_x(struct rs *rs, data_t *data, int *eras_pos) {
     int deg_lambda, el, deg_omega;
     int i, j, r, k;
     data_t u, q, tmp, num1, num2, den, discr_r;
