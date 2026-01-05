@@ -1,3 +1,6 @@
+#ifndef TEA_H
+#define TEA_H
+
 #include "queue.h"
 #include "sys/time.h"
 #include "project_defs.h"
@@ -23,3 +26,5 @@ void no_action();
 #define sysTicks() clock()
 #define SYS_TO_MS(t) (Long)((double)(t)*1000 / CLOCKS_PER_SEC)
 #define SYS_TO_US(t) (Long)((double)(t)*1000*1000 / CLOCKS_PER_SEC)
+
+#endif

@@ -3,6 +3,7 @@
 #include "printers.h"
 #include "queue.c"
 #include <stdio.h>
+#include <time.h>
 
 static QUEUE(10, afterq); // {due, action}*
 static QUEUE(5, laterq); // {action}*
@@ -125,4 +126,10 @@ void serve_tea() {
 
 void init_tea() {
     origin = timeInMilliseconds();
+}
+
+Long get_ticks() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return 1000000 * tv.tv_sec + tv.tv_usec;
 }
