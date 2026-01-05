@@ -6,6 +6,7 @@
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/printersHost.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/rs012.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/mls_scramble012.c \
     ../Tea-host/parameters.c \
     ../Tea-host/rs_main1.c \
     ../Tea-host/tea.c \
