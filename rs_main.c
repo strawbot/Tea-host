@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
-
+#include "ttypes.h"
 #include "rs_tester.h"
 
 void print_test_type(size_t block_length, size_t message_length,
