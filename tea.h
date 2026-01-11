@@ -27,4 +27,6 @@ void no_action();
 #define SYS_TO_MS(t) (Long)((double)(t)*1000 / CLOCKS_PER_SEC)
 #define SYS_TO_US(t) (Long)((double)(t)*1000*1000 / CLOCKS_PER_SEC)
 
+#define safe(code) 	{ code }
+
 #endif
