@@ -109,6 +109,12 @@ void stop(vector action) {
     }
 }
 
+void action_slice() { // like run but only once through the queued actions; full slice
+	Long n = queryq(laterq);
+	while (n-- && queryq(laterq))
+		actionRun((vector)pullq(laterq));
+}
+
 void serve_tea() {
     for (;;) {
         if (queryq(laterq))
@@ -133,3 +139,28 @@ Long get_ticks() {
     gettimeofday(&tv,NULL);
     return 1000000 * tv.tv_sec + tv.tv_usec;
 }
+
+unsigned long build_utc() { return 1767865820; }
+
+Long getTime() { return SYS_TO_MS(sysTicks()); }
+
+Long getUtc() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return tv.tv_sec;
+}
+
+Octet utc_ms() {
+    struct timeval tv;
+    gettimeofday(&tv,NULL);
+    return (Octet)1000 * tv.tv_sec + tv.tv_usec/1000;
+}
+
+void actor(vector action, const char * name) { }
+
+void actionRun(vector action) { action(); }
+
+Cell ret() { return 0; }
+void lit(Cell n) { }
+
+void init_tll() { }

@@ -1,18 +1,35 @@
 // Tea testing
 #include "tea.h"
+#include "encode.h"
+#include "printers.h"
 
 void init_zc();
 void init_decoder();
 void test_mls();
 void test_rs012();
 void test_convo();
+void init_zc();
+void serve_tea();
+
+static Byte alpdu[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
+                       0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
+
+void continue_test() {
+    AirFrame * af = get_airframe();
+    print("\nFrame: "), hbytes(af->frame, af->length);
+}
+
+void frame_test() {
+    encode_airpdu(alpdu, sizeof(alpdu));
+    when(mants_encoded, continue_test);
+}
 
 int main() {
     init_tea();
     init_decoder();
-    // init_zc(); // from init_comps
-    // later(test_mls);
-    // later(test_rs012);
+    init_zc(); // from init_comps
+    later(test_mls);
+    later(test_rs012);
     later(test_convo);
     serve_tea();
     return 0;

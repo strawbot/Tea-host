@@ -6,12 +6,23 @@
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/AirLink \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder \
     -I ../AL200_Platforms/libcorrect/include \
-    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/printersHost.c \
+    -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS \
+    -I ../AL200_Platforms/AL200_OSX/Storage \
+    -I ../AL200_Platforms/AL200_OSX/Console \
+    -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Time \
+    -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/IND \
+    -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encryption \
+    -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Reports \
+    ../AL200_Platforms/AL200_OSX/Decoders/decode_static.c \
     ../AL200_Platforms/AL200_OSX/Decoders/zero_crossings.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/printersHost.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/timeout.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/convolve012.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/rs012.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/mls_scramble012.c \
-    ../AL200_Platforms/AL200_OSX/Decoders/decode_static.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/encode.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/AirLink/mant.c \
+    ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Time/utc.c \
     ../AL200_Platforms/libcorrect/src/convolutional/error_buffer.c \
     ../AL200_Platforms/libcorrect/src/convolutional/lookup.c \
     ../AL200_Platforms/libcorrect/src/convolutional/history_buffer.c \

@@ -1,0 +1,1 @@
+#define lfs_t void
