@@ -10,27 +10,58 @@ void test_rs012();
 void test_convo();
 void init_zc();
 void serve_tea();
+Long frame_bits(Byte * frame, Short n, Byte * bits);
+Long find_bit_sync(Byte * bits);
+Long find_frame_sync(Byte * bits);
+Byte bits_to_bytes(Byte * bits, Byte * bytes);
 
 static Byte alpdu[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
                        0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
 
 void continue_test() {
     AirFrame * af = get_airframe();
-    print("\nFrame: "), hbytes(af->frame, af->length);
+    Byte bits[8*af->length];
+    af->bits = bits;
+    Long n = frame_bits(af->frame, af->length, af->bits);
+    print("\n Encoded: "), printDec(n), hbytes(af->bits, min(30, n));
+
+    print("\nDecoding:");
+    print("\n Find bit sync: ");
+    Long index = find_bit_sync(af->bits);
+    print(" index: "), printDec(index);
+    print("\n Bits to Bytes: "); 
+    Byte bytes[n+1];
+    n = bits_to_bytes(af->bits, bytes);
+    printDec(n); hbytes(bytes, min(30, n));
+    print("\n FEC mode: ");
+    Byte fecmode = find_frame_sync(bytes + BSYNC_SIZE);
+    printDec(fecmode);
+    if (fecmode != 0) { print("\n Cannot decode further! Bad FEC mode."); return; }
+    print("\n Split into segments: ");
+    af->seg1 = bytes + SYNC_SIZE;
+    af->seg2 = n > SEG1_SIZE ? bytes + SYNC_SIZE + SEG1_SIZE : NULL;
+    printDec((af->seg1 != NULL) + (af->seg2 != NULL));
+    print("\n Deconvolve segments: ");
+    print("\n Decode RS blocks: ");
+    print("\n Descramble blocks: ");
+    print("\n Assemble blocks: ");
 }
 
 void frame_test() {
+    print("Encode an airlink pdu for decoding testing:");
+    print("\n airpdu:  "), printDec(sizeof(alpdu)), hbytes(alpdu, sizeof(alpdu));
     encode_airpdu(alpdu, sizeof(alpdu));
     when(mants_encoded, continue_test);
 }
 
 int main() {
     init_tea();
-    init_decoder();
     init_zc(); // from init_comps
-    later(test_mls);
-    later(test_rs012);
-    later(test_convo);
+    init_decoder();
+    // later(test_mls);
+    // later(test_rs012);
+    // later(test_convo);
+    later(frame_test);
     serve_tea();
     return 0;
 }
