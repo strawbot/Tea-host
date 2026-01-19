@@ -14,35 +14,49 @@ Long frame_bits(Byte * frame, Short n, Byte * bits);
 Long find_bit_sync(Byte * bits);
 Long find_frame_sync(Byte * bits);
 Byte bits_to_bytes(Byte * bits, Byte * bytes);
+int decode_buffer(Byte * frame, Byte * decoded, Short length);
+int decode_rs(Byte * data, Long size);
 
 static Byte alpdu[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
                        0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
 
 void continue_test() {
-    AirFrame * af = get_airframe();
-    Byte bits[8*af->length];
-    af->bits = bits;
-    Long n = frame_bits(af->frame, af->length, af->bits);
-    print("\n Encoded: "), printDec(n), hbytes(af->bits, min(30, n));
+    AirFrame * afe = get_airframe();
+    Byte bits[8 * afe->nbytes];
+    afe->bits = bits;
+    afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits);
+    print("\n Encoded: "), printDec(afe->nbits), hbytes(afe->bits, min(30, afe->nbits));
 
     print("\nDecoding:");
+    AirFrame afd = {.bits = afe->bits};
+    Long offset = find_bit_sync(afd.bits);
     print("\n Find bit sync: ");
-    Long index = find_bit_sync(af->bits);
-    print(" index: "), printDec(index);
+    print(" offset = "), printDec(offset);
     print("\n Bits to Bytes: "); 
-    Byte bytes[n+1];
-    n = bits_to_bytes(af->bits, bytes);
-    printDec(n); hbytes(bytes, min(30, n));
+    Byte bytes[afd.nbits+1];
+    afd.bytes = bytes;
+    afd.nbytes = bits_to_bytes(afd.bits + offset, afd.bytes);
+    printDec(afd.nbytes); hbytes(afd.bytes, min(30, afd.nbytes));
     print("\n FEC mode: ");
-    Byte fecmode = find_frame_sync(bytes + BSYNC_SIZE);
+    Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
     printDec(fecmode);
     if (fecmode != 0) { print("\n Cannot decode further! Bad FEC mode."); return; }
     print("\n Split into segments: ");
-    af->seg1 = bytes + SYNC_SIZE;
-    af->seg2 = n > SEG1_SIZE ? bytes + SYNC_SIZE + SEG1_SIZE : NULL;
-    printDec((af->seg1 != NULL) + (af->seg2 != NULL));
+    afd.seg1 = afd.bytes + SYNC_SIZE;
+    afd.nseg1 = SEG1_SIZE;
+    afd.nseg2 = afd.nbytes - SYNC_SIZE > afd.nseg1 ? afd.nbytes - SYNC_SIZE - afd.nseg1 : 0;
+    afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
+    printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
     print("\n Deconvolve segments: ");
+    Byte seg1[afd.nseg1];
+    print("\n  Seg1: ");
+    decode_buffer(afd.seg1, seg1, afd.nseg1);
+    if (afd.nseg2) {
+        Byte seg2[afd.nseg2];
+        print("\n  Seg2: "), decode_buffer(afd.seg2, seg2, afd.nseg2);
+    }
     print("\n Decode RS blocks: ");
+      printDec(decode_rs(seg1, afd.nseg1));
     print("\n Descramble blocks: ");
     print("\n Assemble blocks: ");
 }

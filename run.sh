@@ -13,7 +13,7 @@
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/IND \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encryption \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Reports \
-    ../AL200_Platforms/AL200_OSX/Decoders/decode_static.c \
+    ../AL200_Platforms/AL200_OSX/Decoders/deconvolve.c \
     ../AL200_Platforms/AL200_OSX/Decoders/zero_crossings.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/printersHost.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/timeout.c \
