@@ -16,6 +16,7 @@ Long find_frame_sync(Byte * bits);
 Byte bits_to_bytes(Byte * bits, Byte * bytes, Short len);
 int decode_buffer(Byte * frame, Byte * decoded, Short length);
 int decode_rs(Byte * data, Long size);
+Short count_bits(Byte * bits, Short nbits);
 
 static Byte alpdu1[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
                         0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
@@ -23,7 +24,7 @@ static Byte alpdu2[] = {0x04, 0x00, 0x10, 0x16, 0x03, 0xE8, 0x00, 0x02, 0x04,
                         0x00, 0x12, 0x00, 0x00, 0x01, 0x09, 0x08, 0x11, 0x03,
                         0x0A, 0x11, 0x00, 0x09, 0x11, 0x00, 0x05, 0x02, 0x20,
                         0x40};
-#define TEST_PDU alpdu1
+#define TEST_PDU alpdu2
 
 void continue_test() {
     AirFrame * afe = get_airframe();
@@ -31,7 +32,9 @@ void continue_test() {
     afe->bits = bits;
     afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits);
     print("\n Encoded: "), printDec(afe->nbits), hbytes(afe->bits, min(30, afe->nbits));
-    print("\nDecoding:\n Find bit sync: ");
+    print("\nDecoding: ");
+    printDec(count_bits(afe->bits, afe->nbits)), print("bits");
+    print("\n Find bit sync: ");
     AirFrame afd = {.bits = afe->bits, .nbits = afe->nbits};
     Long offset = find_bit_sync(afd.bits);
     print("  offset = "), printDec(offset);
@@ -54,6 +57,7 @@ void continue_test() {
     afd.seg1 = afd.bytes + SYNC_SIZE;
     afd.nseg1 = SEG1_SIZE;
     afd.nseg2 = afd.nbytes - SYNC_SIZE > afd.nseg1 ? afd.nbytes - SYNC_SIZE - afd.nseg1 : 0;
+    Byte seg2[afd.nseg2 ? afd.nseg2 : 1];
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
     printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
     printDec(afd.nseg1), print("bytes  ");
@@ -62,9 +66,10 @@ void continue_test() {
     print("\n  Seg1: ");
     decode_buffer(afd.seg1, seg1, afd.nseg1);
     if (afd.nseg2) {
-        Byte seg2[afd.nseg2];
         print("\n  Seg2: "), decode_buffer(afd.seg2, seg2, afd.nseg2);
         afd.nseg2 = (afd.nseg2 - CONV_TAIL)/2 - afd.nrs;
+        decode_rs(seg2, afd.nseg2);
+        unscramble_blk(seg2, afd.nseg2);
     }
     afd.nseg1 = (afd.nseg1 - CONV_TAIL)/2 - afd.nrs;
     // print("  NSEG1 = "), printDec(afd.nseg1);
@@ -77,7 +82,9 @@ void continue_test() {
     print("\n Assemble blocks: ");
     print("\n airpdu:  ");
     Short len = seg1[0] << 8 | seg1[1];
-    printDec(len), hbytes(seg1 + 2, min(30,len));
+    Short n = min(len, afd.nseg1 - 2);
+    printDec(len), hbytes(seg1 + 2, n);
+    hbytes(seg2, afd.nseg2);
     printCr();
 }
 
