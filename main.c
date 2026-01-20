@@ -17,8 +17,13 @@ Byte bits_to_bytes(Byte * bits, Byte * bytes, Short len);
 int decode_buffer(Byte * frame, Byte * decoded, Short length);
 int decode_rs(Byte * data, Long size);
 
-static Byte alpdu[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
-                       0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
+static Byte alpdu1[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
+                        0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
+static Byte alpdu2[] = {0x04, 0x00, 0x10, 0x16, 0x03, 0xE8, 0x00, 0x02, 0x04,
+                        0x00, 0x12, 0x00, 0x00, 0x01, 0x09, 0x08, 0x11, 0x03,
+                        0x0A, 0x11, 0x00, 0x09, 0x11, 0x00, 0x05, 0x02, 0x20,
+                        0x40};
+#define TEST_PDU alpdu1
 
 void continue_test() {
     AirFrame * afe = get_airframe();
@@ -26,16 +31,20 @@ void continue_test() {
     afe->bits = bits;
     afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits);
     print("\n Encoded: "), printDec(afe->nbits), hbytes(afe->bits, min(30, afe->nbits));
-    print("\nDecoding:");
+    print("\nDecoding:\n Find bit sync: ");
     AirFrame afd = {.bits = afe->bits, .nbits = afe->nbits};
     Long offset = find_bit_sync(afd.bits);
-    print("\n Find bit sync: ");
-    print(" offset = "), printDec(offset);
+    print("  offset = "), printDec(offset);
     print("\n Bits to Bytes: "); 
     Byte bytes[afd.nbits+1];
     afd.bytes = bytes;
     afd.nbytes = bits_to_bytes(afd.bits + offset, afd.bytes, afd.nbits);
     printDec(afd.nbytes); hbytes(afd.bytes, min(30, afd.nbytes));
+
+    print("\nInject 8 errors");
+    for (Byte i = 0; i < 9; i++)
+        afd.bytes[10 + i * 2] ^= 0xFF; // inject error
+
     print("\n FEC mode: ");
     Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
     printDec(fecmode);
@@ -44,10 +53,10 @@ void continue_test() {
     afd.nrs = FEC0_NROOTS; // nroots
     afd.seg1 = afd.bytes + SYNC_SIZE;
     afd.nseg1 = SEG1_SIZE;
-    // print("  NSEG1 = "), printDec(afd.nseg1);
     afd.nseg2 = afd.nbytes - SYNC_SIZE > afd.nseg1 ? afd.nbytes - SYNC_SIZE - afd.nseg1 : 0;
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
     printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
+    printDec(afd.nseg1), print("bytes  ");
     print("\n Deconvolve segments: ");
     Byte seg1[afd.nseg1/2];
     print("\n  Seg1: ");
@@ -74,8 +83,8 @@ void continue_test() {
 
 void frame_test() {
     print("Encode an airlink pdu for decoding testing:");
-    print("\n airpdu:  "), printDec(sizeof(alpdu)), hbytes(alpdu, sizeof(alpdu));
-    encode_airpdu(alpdu, sizeof(alpdu));
+    print("\n airpdu:  "), printDec(sizeof(TEST_PDU)), hbytes(TEST_PDU, sizeof(TEST_PDU));
+    encode_airpdu(TEST_PDU, sizeof(TEST_PDU));
     when(mants_encoded, continue_test);
 }
 
