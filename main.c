@@ -14,7 +14,7 @@ void serve_tea();
 Long frame_bits(Byte * frame, Short n, Byte * bits);
 Long find_bit_sync(Byte * bits);
 Long find_frame_sync(Byte * bits);
-Byte bits_to_bytes(Byte * bits, Byte * bytes, Short len);
+Short bits_to_bytes(Byte * bits, Byte * bytes, Short len);
 int decode_buffer(Byte * frame, Byte * decoded, Short length);
 int decode_rs(Byte * data, Long size);
 Short count_bits(Byte * bits, Short nbits);
@@ -51,7 +51,10 @@ void continue_test() {
     afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits);
     print("\n Encoded: "), printDec(afe->nbits), hbytes(afe->bits, min(30, afe->nbits));
     print("\nDecoding: ");
-    printDec(count_bits(afe->bits, afe->nbits)), print("bits");
+    Short b;
+    printDec((b = count_bits(afe->bits, afe->nbits))), print("bits  ");
+    printDec(b/8), print("bytes");
+
     print("\n Find bit sync: ");
     AirFrame afd = {.bits = afe->bits, .nbits = afe->nbits};
     Long offset = find_bit_sync(afd.bits);
@@ -64,7 +67,7 @@ void continue_test() {
 
     print("\nInject 8 errors");
     for (Byte i = 0; i < 9; i++)
-        afd.bytes[10 + i * 2] ^= 0xFF; // inject error
+        afd.bytes[10 + afd.nbytes/8 + i] ^= 0xFF; // inject error
 
     print("\n FEC mode: ");
     Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
@@ -79,25 +82,38 @@ void continue_test() {
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
     printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
     printDec(afd.nseg1), print("bytes  ");
-    print("\n Deconvolve segments: ");
+
+    print("\n Deconvolve segment 1: "); // nseg1 length is for data only
     Byte seg1[afd.nseg1/2];
     print("\n  Seg1: "), printDec(afd.nseg1);
     decode_buffer(afd.seg1, seg1, afd.nseg1);
-    if (afd.nseg2) {
-        print("\n  Seg2: "), printDec(afd.nseg2);
-        decode_buffer(afd.seg2, seg2, afd.nseg2);
-        afd.nseg2 = (afd.nseg2 - CONV_TAIL)/2 - afd.nrs;
-        decode_rs(seg2, afd.nseg2);
-        unscramble_blk(seg2, afd.nseg2);
-    }
     afd.nseg1 = (afd.nseg1 - CONV_TAIL)/2 - afd.nrs;
     // print("  NSEG1 = "), printDec(afd.nseg1);
-    print("\n Decode RS blocks: ");
+    print("\n  Decode RS blocks: ");
     printDec(decode_rs(seg1, afd.nseg1));
     hbytes(seg1, afd.nseg1);
-    print("\n Descramble blocks: ");
+    print("\n  Descramble blocks: ");
     unscramble_blk(seg1, afd.nseg1);
     hbytes(seg1, afd.nseg1);
+
+    Byte rsblock = BLOCKm + afd.nrs; // nseg2 includes data plus error codes
+    if (afd.nseg2) {
+        print("\n Deconvolve segment 2: ");
+        print("\n  Seg2: "), printDec(afd.nseg2);
+        decode_buffer(afd.seg2, seg2, afd.nseg2);
+        
+        print("\n  Decode RS blocks: ");
+        afd.nseg2 = (afd.nseg2 - CONV_TAIL)/2;
+        for (Short i = 0; i < afd.nseg2; i += rsblock) {
+            int n = min(rsblock, afd.nseg2 - i) - afd.nrs;
+            if (n > 0) {
+                printDec(decode_rs(seg2 + i, n));
+                unscramble_blk(seg2 + i, n);
+            } else
+                printDec(n);
+        }
+    }
+
     print("\n Assemble blocks: ");
     print("\n airpdu:  ");
     Short len = seg1[0] << 8 | seg1[1];
@@ -107,7 +123,9 @@ void continue_test() {
 
     Byte airpdu[len];
     memcpy(airpdu, seg1 + 2, nseg1);
-    memcpy(airpdu + nseg1, seg2, afd.nseg2);
+    for (Short i = 0, j = 0; i < afd.nseg2; i += rsblock, j += BLOCKm)
+        memcpy(airpdu + nseg1 + j, seg2 + i, BLOCKm);
+
     if (len == sizeof(TEST_PDU) && memcmp(airpdu, TEST_PDU, sizeof(TEST_PDU)) == 0)
         print("  Matched ");
     else
