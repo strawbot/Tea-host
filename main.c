@@ -49,7 +49,7 @@ void continue_test() {
     Byte bits[8 * afe->nbytes];
     afe->bits = bits;
     afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits);
-    print("\n Encoded: "), printDec(afe->nbits), hbytes(afe->bits, min(30, afe->nbits));
+    print("\n Encoded: "), printDec(afe->nbits), print("bytes  "), hbytes(afe->bits, min(30, afe->nbits));
     print("\nDecoding: ");
     Short b;
     printDec((b = count_bits(afe->bits, afe->nbits))), print("bits  ");
@@ -65,9 +65,9 @@ void continue_test() {
     afd.nbytes = bits_to_bytes(afd.bits + offset, afd.bytes, afd.nbits);
     printDec(afd.nbytes); hbytes(afd.bytes, min(30, afd.nbytes));
 
-    print("\nInject 8 errors");
-    for (Byte i = 0; i < 9; i++)
-        afd.bytes[10 + afd.nbytes/8 + i] ^= 0xFF; // inject error
+    // print("\nInject 8 errors");
+    // for (Byte i = 0; i < 9; i++)
+    //     afd.bytes[10 + afd.nbytes/8 + i] ^= 0xFF; // inject error
 
     print("\n FEC mode: ");
     Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
@@ -81,34 +81,40 @@ void continue_test() {
     Byte seg2[afd.nseg2 ? afd.nseg2 : 1];
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
     printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
-    printDec(afd.nseg1), print("bytes  ");
+    printDec(afd.nseg1 + afd.nseg2), print("bytes  ");
 
     print("\n Deconvolve segment 1: "); // nseg1 length is for data only
     Byte seg1[afd.nseg1/2];
-    print("\n  Seg1: "), printDec(afd.nseg1);
+    printDec(afd.nseg1), print("bytes  ");
     decode_buffer(afd.seg1, seg1, afd.nseg1);
     afd.nseg1 = (afd.nseg1 - CONV_TAIL)/2 - afd.nrs;
     // print("  NSEG1 = "), printDec(afd.nseg1);
-    print("\n  Decode RS blocks: ");
+    print("\n  Decode errors in block 1: ");
     printDec(decode_rs(seg1, afd.nseg1));
-    hbytes(seg1, afd.nseg1);
-    print("\n  Descramble blocks: ");
+    print("\n  Descramble block 1: ");
     unscramble_blk(seg1, afd.nseg1);
     hbytes(seg1, afd.nseg1);
 
-    Byte rsblock = BLOCKm + afd.nrs; // nseg2 includes data plus error codes
+    // Assemble block 1
+    Short len = seg1[0] << 8 | seg1[1];
+    Byte airpdu[len];
+    Short nseg1 = min(len, afd.nseg1 - 2);
+    memcpy(airpdu, seg1 + 2, nseg1);
+
     if (afd.nseg2) {
         print("\n Deconvolve segment 2: ");
-        print("\n  Seg2: "), printDec(afd.nseg2);
+        printDec(afd.nseg2), print("bytes  ");
         decode_buffer(afd.seg2, seg2, afd.nseg2);
         
-        print("\n  Decode RS blocks: ");
+        print("\n  Decode errors in blocks: ");
         afd.nseg2 = (afd.nseg2 - CONV_TAIL)/2;
-        for (Short i = 0; i < afd.nseg2; i += rsblock) {
-            int n = min(rsblock, afd.nseg2 - i) - afd.nrs;
+        Byte rsblock = BLOCKm + afd.nrs;
+        for (Short s = 0, d = 0; s < afd.nseg2; s += rsblock, d += BLOCKm) {
+            int n = min(rsblock, afd.nseg2 - s) - afd.nrs;
             if (n > 0) {
-                printDec(decode_rs(seg2 + i, n));
-                unscramble_blk(seg2 + i, n);
+                printDec(decode_rs(seg2 + s, n));
+                unscramble_blk(seg2 + s, n);
+                memcpy(airpdu + nseg1 + d, seg2 + s, n);
             } else
                 printDec(n);
         }
@@ -116,15 +122,7 @@ void continue_test() {
 
     print("\n Assemble blocks: ");
     print("\n airpdu:  ");
-    Short len = seg1[0] << 8 | seg1[1];
-    Short nseg1 = min(len, afd.nseg1 - 2);
-    printDec(len), hbytes(seg1 + 2, nseg1); // start of airpdu
-    hbytes(seg2, min(40-nseg1, afd.nseg2));
-
-    Byte airpdu[len];
-    memcpy(airpdu, seg1 + 2, nseg1);
-    for (Short i = 0, j = 0; i < afd.nseg2; i += rsblock, j += BLOCKm)
-        memcpy(airpdu + nseg1 + j, seg2 + i, BLOCKm);
+    printDec(len), print("bytes  "), hbytes(airpdu, min(40, len));
 
     if (len == sizeof(TEST_PDU) && memcmp(airpdu, TEST_PDU, sizeof(TEST_PDU)) == 0)
         print("  Matched ");
@@ -135,7 +133,8 @@ void continue_test() {
 
 void frame_test() {
     print("Encode an airlink pdu for decoding testing:");
-    print("\n airpdu:  "), printDec(sizeof(TEST_PDU)), hbytes(TEST_PDU, min(40,sizeof(TEST_PDU)));
+    print("\n airpdu:  "), printDec(sizeof(TEST_PDU));
+    print("bytes  "), hbytes(TEST_PDU, min(40,sizeof(TEST_PDU)));
     encode_airpdu(TEST_PDU, sizeof(TEST_PDU));
     when(mants_encoded, continue_test);
 }
