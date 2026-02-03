@@ -13,8 +13,13 @@
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/IND \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encryption \
     -I ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Reports \
-    ../AL200_Platforms/AL200_OSX/Decoders/deconvolve.c \
-    ../AL200_Platforms/AL200_OSX/Decoders/zero_crossings.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/error_buffer.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/lookup.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/history_buffer.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/metric.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/bit.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/convolutional.c \
+    ../AL200_Platforms/libcorrect/src/convolutional/decode.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/printersHost.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/TimbreOS/timeout.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/convolve012.c \
@@ -23,13 +28,8 @@
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Encoder/encode.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/AirLink/mant.c \
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Time/utc.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/error_buffer.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/lookup.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/history_buffer.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/metric.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/bit.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/convolutional.c \
-    ../AL200_Platforms/libcorrect/src/convolutional/decode.c \
+    ../AL200_Platforms/AL200_OSX/Decoders/deconvolve.c \
+    ../AL200_Platforms/AL200_OSX/Decoders/zero_crossings.c \
     parameters.c \
     tea.c \
     main.c \

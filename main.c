@@ -2,6 +2,7 @@
 #include "tea.h"
 #include "encode.h"
 #include "printers.h"
+#include "parameters.h"
 #include <string.h>
 
 void init_zc();
@@ -15,9 +16,12 @@ Long frame_bits(Byte * frame, Short n, Byte * bits);
 Long find_bit_sync(Byte * bits);
 Long find_frame_sync(Byte * bits);
 Short bits_to_bytes(Byte * bits, Byte * bytes, Short len);
+Short puncbits_to_bytes(Byte * bits, Byte * bytes, Short nbits, Byte mode);
 int decode_buffer(Byte * frame, Byte * decoded, Short length);
 int decode_rs(Byte * data, Long size);
 Short count_bits(Byte * bits, Short nbits);
+Byte * trim_bits(Byte * seq, Byte bits);
+Short match_bit_seqs(Byte * sync, Byte * frame);
 
 static Byte alpdu1[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
                         0x01, 0x06, 0x08, 0x11, 0x84, 0xC9, 0x11, 0x04};
@@ -44,6 +48,9 @@ static Byte alpdu3[] = {0x04, 0x00, 0x10, 0xD5, 0x03, 0xE8, 0x10, 0x02, 0x80, 0x
       
 #define TEST_PDU alpdu3
 
+extern Byte bit_sync_bits[BSYNC_SIZE * 8];
+extern Byte frame_sync_bits[3][FSYNC_SIZE * 8];
+
 void continue_test() {
     AirFrame * afe = get_airframe();
     Byte bits[8 * afe->nbytes];
@@ -55,29 +62,51 @@ void continue_test() {
     printDec((b = count_bits(afe->bits, afe->nbits))), print("bits  ");
     printDec(b/8), print("bytes");
 
-    print("\n Find bit sync: ");
+    Byte temp[b/8];
+    Short n = bits_to_bytes(bits, temp, afe->nbits);
+    print("\nRaw bytes: "), hbytes(temp, min(n,30));
+
+    print("\n Find bit sync:");
     AirFrame afd = {.bits = afe->bits, .nbits = afe->nbits};
-    Long offset = find_bit_sync(afd.bits);
-    print("  offset = "), printDec(offset);
+    Long offset = find_bit_sync(afd.bits - 1);
+    print(" offset = "), printDec(offset);
+    if (offset >= afd.nbits) {
+        print("  No bit sync match ");
+        return;
+    }
+#define view 80
+    print("\nBitsyncbits:"),hbytes(bit_sync_bits,strlen((char *)bit_sync_bits));
+    print("\nFramesyncbits:"),hbytes(frame_sync_bits[0],strlen((char *)frame_sync_bits[0]));
+    // print("\nBits: "), hbytes(bits, view);
+    // print("\nafd.Bits: "), hbytes(afd.bits, view);
+    afd.bits = trim_bits(afd.bits, offset + BSYNC_SIZE * 8);
+    // print("\nafd.Bits: "), hbytes(afd.bits, view);
+    // print("\nBits: "), hbytes(bits, view);
+    print("\n FEC mode: ");
+    Byte fecmode = find_frame_sync(afd.bits);
+    printDec(fecmode);
+    if (fecmode > 2) { print("\n Cannot decode further! Bad FEC mode."); return; }
+
+    afd.bits = trim_bits(afd.bits, FSYNC_SIZE * 8);
+    // print("\nafd.Bits: "), hbytes(afd.bits, view);
+    // print("\nBits: "), hbytes(bits, view);
+    afd.nbits -= afd.bits - afe->bits; // recalculate length after removing syncs
     print("\n Bits to Bytes: "); 
     Byte bytes[afd.nbits+1];
     afd.bytes = bytes;
-    afd.nbytes = bits_to_bytes(afd.bits + offset, afd.bytes, afd.nbits);
-    printDec(afd.nbytes); hbytes(afd.bytes, min(30, afd.nbytes));
+    afd.nbytes = bits_to_bytes(afd.bits, afd.bytes, afd.nbits);
+    // afd.nbytes = puncbits_to_bytes(afd.bits, afd.bytes, afd.nbits, fecmode);
+    printDec(afd.nbytes), print("bytes "); hbytes(afd.bytes, min(30, afd.nbytes));
 
     // print("\nInject 8 errors");
     // for (Byte i = 0; i < 9; i++)
     //     afd.bytes[10 + afd.nbytes/8 + i] ^= 0xFF; // inject error
 
-    print("\n FEC mode: ");
-    Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
-    printDec(fecmode);
-    if (fecmode != 0) { print("\n Cannot decode further! Bad FEC mode."); return; }
     print("\n Split into segments: ");
-    afd.nrs = FEC0_NROOTS; // nroots
-    afd.seg1 = afd.bytes + SYNC_SIZE;
-    afd.nseg1 = SEG1_SIZE;
-    afd.nseg2 = afd.nbytes - SYNC_SIZE > afd.nseg1 ? afd.nbytes - SYNC_SIZE - afd.nseg1 : 0;
+    afd.nrs = fecmode == 0 ? FEC0_NROOTS : FEC12_NROOTS; // nroots
+    afd.seg1 = afd.bytes;
+    afd.nseg1 = fecmode == 0 ? SEG10_SIZE : fecmode == 1 ? SEG11_SIZE : SEG12_SIZE;
+    afd.nseg2 = afd.nbytes > afd.nseg1 ? afd.nbytes - afd.nseg1 : 0;
     Byte seg2[afd.nseg2 ? afd.nseg2 : 1];
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
     printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
@@ -86,8 +115,7 @@ void continue_test() {
     print("\n Deconvolve segment 1: "); // nseg1 length is for data only
     Byte seg1[afd.nseg1/2];
     printDec(afd.nseg1), print("bytes  ");
-    decode_buffer(afd.seg1, seg1, afd.nseg1);
-    afd.nseg1 = (afd.nseg1 - CONV_TAIL)/2 - afd.nrs;
+    afd.nseg1 = decode_buffer(afd.seg1, seg1, afd.nseg1) - afd.nrs;
     // print("  NSEG1 = "), printDec(afd.nseg1);
     print("\n  Decode errors in block 1: ");
     printDec(decode_rs(seg1, afd.nseg1));
@@ -97,6 +125,7 @@ void continue_test() {
 
     // Assemble block 1
     Short len = seg1[0] << 8 | seg1[1];
+    if (len > 1023) { print("\n Length is too big, aborting decoding"); return; }
     Byte airpdu[len];
     Short nseg1 = min(len, afd.nseg1 - 2);
     memcpy(airpdu, seg1 + 2, nseg1);
@@ -104,12 +133,12 @@ void continue_test() {
     if (afd.nseg2) {
         print("\n Deconvolve segment 2: ");
         printDec(afd.nseg2), print("bytes  ");
-        decode_buffer(afd.seg2, seg2, afd.nseg2);
         
         print("\n  Decode errors in blocks: ");
-        afd.nseg2 = (afd.nseg2 - CONV_TAIL)/2;
-        Byte rsblock = BLOCKm + afd.nrs;
-        for (Short s = 0, d = 0; s < afd.nseg2; s += rsblock, d += BLOCKm) {
+        afd.nseg2 = decode_buffer(afd.seg2, seg2, afd.nseg2);
+        Byte blockm = fecmode == 0 ? BLOCKm0 : fecmode == 1 ? BLOCKm1 : BLOCKm2;
+        Byte rsblock = blockm + afd.nrs;
+        for (Short s = 0, d = 0; s < afd.nseg2; s += rsblock, d += blockm) {
             int n = min(rsblock, afd.nseg2 - s) - afd.nrs;
             if (n > 0) {
                 printDec(decode_rs(seg2 + s, n));
@@ -135,6 +164,7 @@ void frame_test() {
     print("Encode an airlink pdu for decoding testing:");
     print("\n airpdu:  "), printDec(sizeof(TEST_PDU));
     print("bytes  "), hbytes(TEST_PDU, min(40,sizeof(TEST_PDU)));
+    set_value(FEC_Mode, FEC_MODE1);
     encode_airpdu(TEST_PDU, sizeof(TEST_PDU));
     when(mants_encoded, continue_test);
 }
@@ -146,7 +176,8 @@ int main() {
     // later(test_mls);
     // later(test_rs012);
     // later(test_convo);
-    later(frame_test);
+    later(test_convo);
+    // later(frame_test);
     serve_tea();
     return 0;
 }
