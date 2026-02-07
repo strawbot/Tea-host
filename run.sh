@@ -1,3 +1,4 @@
+ echo "----- Test Start -----"
  rm -f a.out; \
  gcc \
     -Wno-unknown-attributes \

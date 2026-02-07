@@ -17,10 +17,10 @@ Long find_bit_sync(Byte * bits);
 Long find_frame_sync(Byte * bits);
 Short bits_to_bytes(Byte * bits, Byte * bytes, Short len);
 Short puncbits_to_bytes(Byte * bits, Byte * bytes, Short nbits, Byte mode);
-int decode_buffer(Byte * frame, Byte * decoded, Short length);
+int deconvolve_buffer(Byte * frame, Byte * decoded, Short length);
 int decode_rs(Byte * data, Long size);
 Short count_bits(Byte * bits, Short nbits);
-Byte * trim_bits(Byte * seq, Byte bits);
+Byte * trim_bits(Byte * seq, Short bits);
 Short match_bit_seqs(Byte * sync, Byte * frame);
 
 static Byte alpdu1[] = {0x00, 0x00, 0x10, 0x0B, 0x0B, 0xB8, 0x44, 0x5A, 0xEC,
@@ -46,25 +46,27 @@ static Byte alpdu3[] = {0x04, 0x00, 0x10, 0xD5, 0x03, 0xE8, 0x10, 0x02, 0x80, 0x
       0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x01, 0x0F, 0x01, 0x34, 0x7F, 
       0xC0, 0x00, 0x00, 0x0A, 0x11, 0x00, 0x08, 0x11, 0x02, 0x09, 0x11, 0x00};
       
-#define TEST_PDU alpdu3
+#define TEST_PDU alpdu1
 
 extern Byte bit_sync_bits[BSYNC_SIZE * 8];
 extern Byte frame_sync_bits[3][FSYNC_SIZE * 8];
+#define view 80
 
 void continue_test() {
     AirFrame * afe = get_airframe();
     Byte bits[8 * afe->nbytes];
     afe->bits = bits;
-    afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits);
-    print("\n Encoded: "), printDec(afe->nbits), print("bytes  "), hbytes(afe->bits, min(30, afe->nbits));
+    afe->nbits = frame_bits(afe->bytes, afe->nbytes, afe->bits); // nbits is number of sequences
+    print("\n Encoded: "), printDec(afe->nbytes), print("bytes  "), hbytes(afe->bytes, min(30, afe->nbytes));
+    print("\n Encoded: "), printDec(afe->nbits), print("bits  "), hbytes(afe->bits, min(30, afe->nbits));
     print("\nDecoding: ");
     Short b;
     printDec((b = count_bits(afe->bits, afe->nbits))), print("bits  ");
     printDec(b/8), print("bytes");
 
-    Byte temp[b/8];
-    Short n = bits_to_bytes(bits, temp, afe->nbits);
-    print("\nRaw bytes: "), hbytes(temp, min(n,30));
+    // Byte temp[b/8]; // maybe too large if agc is included; need to get to pipe-block model
+    // Short n = bits_to_bytes(bits, temp, afe->nbits);
+    // print("\nRaw bytes: "), hbytes(temp, min(n,30));
 
     print("\n Find bit sync:");
     AirFrame afd = {.bits = afe->bits, .nbits = afe->nbits};
@@ -74,39 +76,39 @@ void continue_test() {
         print("  No bit sync match ");
         return;
     }
-#define view 80
-    print("\nBitsyncbits:"),hbytes(bit_sync_bits,strlen((char *)bit_sync_bits));
-    print("\nFramesyncbits:"),hbytes(frame_sync_bits[0],strlen((char *)frame_sync_bits[0]));
+    // print("\n Bitsyncbits:"),hbytes(bit_sync_bits,strlen((char *)bit_sync_bits));
+    // print("\n Framesyncbits:"),hbytes(frame_sync_bits[0],strlen((char *)frame_sync_bits[0]));
     // print("\nBits: "), hbytes(bits, view);
     // print("\nafd.Bits: "), hbytes(afd.bits, view);
-    afd.bits = trim_bits(afd.bits, offset + BSYNC_SIZE * 8);
+    afd.bits = trim_bits(afd.bits, offset);
+    afd.nbits -= offset; // recalculate length after removing syncs
     // print("\nafd.Bits: "), hbytes(afd.bits, view);
     // print("\nBits: "), hbytes(bits, view);
-    print("\n FEC mode: ");
-    Byte fecmode = find_frame_sync(afd.bits);
-    printDec(fecmode);
-    if (fecmode > 2) { print("\n Cannot decode further! Bad FEC mode."); return; }
 
-    afd.bits = trim_bits(afd.bits, FSYNC_SIZE * 8);
+    // afd.bits = trim_bits(afd.bits, FSYNC_SIZE * 8);
     // print("\nafd.Bits: "), hbytes(afd.bits, view);
     // print("\nBits: "), hbytes(bits, view);
-    afd.nbits -= afd.bits - afe->bits; // recalculate length after removing syncs
-    print("\n Bits to Bytes: "); 
     Byte bytes[afd.nbits+1];
     afd.bytes = bytes;
     afd.nbytes = bits_to_bytes(afd.bits, afd.bytes, afd.nbits);
     // afd.nbytes = puncbits_to_bytes(afd.bits, afd.bytes, afd.nbits, fecmode);
+    print("\n Bits to Bytes: "); 
     printDec(afd.nbytes), print("bytes "); hbytes(afd.bytes, min(30, afd.nbytes));
-
     // print("\nInject 8 errors");
     // for (Byte i = 0; i < 9; i++)
     //     afd.bytes[10 + afd.nbytes/8 + i] ^= 0xFF; // inject error
 
+    Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
+    if (fecmode > 2) { print("\n Cannot decode further! Bad FEC mode."); return; }
+
+    print("\n FEC mode: ");
+    printDec(fecmode);
+
     print("\n Split into segments: ");
     afd.nrs = fecmode == 0 ? FEC0_NROOTS : FEC12_NROOTS; // nroots
-    afd.seg1 = afd.bytes;
+    afd.seg1 = afd.bytes + SYNC_SIZE;
     afd.nseg1 = fecmode == 0 ? SEG10_SIZE : fecmode == 1 ? SEG11_SIZE : SEG12_SIZE;
-    afd.nseg2 = afd.nbytes > afd.nseg1 ? afd.nbytes - afd.nseg1 : 0;
+    afd.nseg2 = afd.nbytes > afd.nseg1 ? afd.nbytes - SYNC_SIZE - afd.nseg1 : 0;
     Byte seg2[afd.nseg2 ? afd.nseg2 : 1];
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
     printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
@@ -115,7 +117,9 @@ void continue_test() {
     print("\n Deconvolve segment 1: "); // nseg1 length is for data only
     Byte seg1[afd.nseg1/2];
     printDec(afd.nseg1), print("bytes  ");
-    afd.nseg1 = decode_buffer(afd.seg1, seg1, afd.nseg1) - afd.nrs;
+    int n = deconvolve_buffer(afd.seg1, seg1, afd.nseg1*8) - afd.nrs;
+    if (n < 0) { print("\n Faild deconvolving"); return; }
+    afd.nseg1 = n;
     // print("  NSEG1 = "), printDec(afd.nseg1);
     print("\n  Decode errors in block 1: ");
     printDec(decode_rs(seg1, afd.nseg1));
@@ -135,7 +139,9 @@ void continue_test() {
         printDec(afd.nseg2), print("bytes  ");
         
         print("\n  Decode errors in blocks: ");
-        afd.nseg2 = decode_buffer(afd.seg2, seg2, afd.nseg2);
+        n = deconvolve_buffer(afd.seg2, seg2, afd.nseg2*8);
+        if (n < 0) { print("\n Faild deconvolving"); return; }
+        afd.nseg2 = n;
         Byte blockm = fecmode == 0 ? BLOCKm0 : fecmode == 1 ? BLOCKm1 : BLOCKm2;
         Byte rsblock = blockm + afd.nrs;
         for (Short s = 0, d = 0; s < afd.nseg2; s += rsblock, d += blockm) {
@@ -164,7 +170,7 @@ void frame_test() {
     print("Encode an airlink pdu for decoding testing:");
     print("\n airpdu:  "), printDec(sizeof(TEST_PDU));
     print("bytes  "), hbytes(TEST_PDU, min(40,sizeof(TEST_PDU)));
-    set_value(FEC_Mode, FEC_MODE1);
+    set_value(FEC_Mode, FEC_MODE0);
     encode_airpdu(TEST_PDU, sizeof(TEST_PDU));
     when(mants_encoded, continue_test);
 }
@@ -175,7 +181,6 @@ int main() {
     init_decoder();
     // later(test_mls);
     // later(test_rs012);
-    // later(test_convo);
     later(test_convo);
     // later(frame_test);
     serve_tea();
