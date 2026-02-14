@@ -46,12 +46,44 @@ static Byte alpdu3[] = {0x04, 0x00, 0x10, 0xD5, 0x03, 0xE8, 0x10, 0x02, 0x80, 0x
       0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x01, 0x0F, 0x01, 0x34, 0x7F, 
       0xC0, 0x00, 0x00, 0x0A, 0x11, 0x00, 0x08, 0x11, 0x02, 0x09, 0x11, 0x00};
 
-#define TEST_PDU alpdu1
-#define TEST_SIZE sizeof(TEST_PDU)
-
 extern Byte bit_sync_bits[BSYNC_SIZE * 8];
 extern Byte frame_sync_bits[3][FSYNC_SIZE * 8];
 #define view 80
+
+static Byte fec = 0, pdu = 0;
+static Byte * pdus[3] = {alpdu1, alpdu2, alpdu3};
+static Long pdu_size[3] = {sizeof(alpdu1), sizeof(alpdu2), sizeof(alpdu3)};
+static Byte * test_pdu = alpdu1;
+static Long test_size = sizeof(alpdu1);
+static Byte success = 0;
+static Byte tests = 0;
+
+static void next_test() {
+    print("\n==== Encode an airlink pdu for decoding testing in fec mode: ");
+    printDec(fec);
+    print("\n airpdu:  "), printDec(test_size);
+    print("bytes  "), hbytes(test_pdu, min(40,test_size));
+    set_value(FEC_Mode, fec);
+    encode_airpdu(test_pdu, test_size);
+}
+
+static void finish_test() {
+    tests++;
+    if (++pdu == 3) {
+        if (++fec == 3) {
+            print("\nNumber of tests, successess: "), printDec(tests), printDec(success);
+            return;
+        }
+        pdu = 0;
+    }
+    test_pdu = pdus[pdu];
+    test_size = pdu_size[pdu];
+    later(next_test);
+}
+
+void fec2_bits(Long n) { // n bytes is how many coded bits with tail and punctures
+
+}
 
 void continue_test() {
     AirFrame * afe = get_airframe();
@@ -163,23 +195,26 @@ hbytes(seg1, n + afd.nrs), print("  ");
     print("\n Assemble blocks: ");
     print("\n airpdu:  ");
     printDec(len), print("bytes  "), hbytes(airpdu, min(40, len));
-
-    if (len == TEST_SIZE && memcmp(airpdu, TEST_PDU, TEST_SIZE) == 0)
-        print("  Matched ");
-    else
+    if (len == test_size && memcmp(airpdu, test_pdu, test_size) == 0)
+        success++, print("  Matched ");
+    else {
         print("  Different! ");
+        for (Short i = 0; i < test_size; i++)
+            if (airpdu[i] != test_pdu[i]) {
+                print("at byte "), printDec(i);
+                break;
+            }
+    }
     printCr();
+
+    finish_test();
 }
 
 void frame_test() {
-    print("Encode an airlink pdu for decoding testing:");
-    print("\n airpdu:  "), printDec(TEST_SIZE);
-    print("bytes  "), hbytes(TEST_PDU, min(40,TEST_SIZE));
-
-    set_value(FEC_Mode, FEC_MODE1);
-
-    encode_airpdu(TEST_PDU, TEST_SIZE);
+    pdu = 0;
+    fec = 0;
     when(mants_encoded, continue_test);
+    later(next_test);
 }
 
 int main() {
