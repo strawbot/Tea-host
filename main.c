@@ -116,7 +116,6 @@ static Byte * test_pdu = alpdu1;
 static Long test_size = sizeof(alpdu1);
 static Long success = 0;
 static Long tests = 0;
-static Long ntests = 0;
 
 static void next_test() {
     print("\n==== Encode an airlink pdu for decoding testing in fec mode: ");
@@ -129,13 +128,13 @@ static void next_test() {
 
 static void finish_test() {
     tests++;
-    if (--ntests == 0) {
+    if (fec == 2 && test_size == 1023) {
         print("\nNumber of tests, successess: "), printDec(tests), printDec(success);
         return;
     }
     fec = (fec + 1 ) % 3;
-    test_pdu = pdus[2];
-    test_size = rand()%pdu_size[2] + 1;
+    if (fec == 0)
+        test_size++;
     later(next_test);
 }
 
@@ -280,9 +279,10 @@ hbytes(seg1, n + afd.nrs), print("  ");
 }
 
 void frame_test() {
+    test_pdu = pdus[2];
+    test_size = 1;
     pdu = 0;
     fec = 0;
-    ntests = 100000;
     when(mants_encoded, continue_test);
     later(next_test);
 }
