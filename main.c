@@ -118,10 +118,10 @@ static Long success = 0;
 static Long tests = 0;
 
 static void next_test() {
-    print("\n==== Encode an airlink pdu for decoding testing in fec mode: ");
-    printDec(fec);
-    print("\n airpdu:  "), printDec(test_size);
-    print("bytes  "), hbytes(test_pdu, min(40,test_size));
+    // print("\n==== Encode an airlink pdu for decoding testing in fec mode: ");
+    // printDec(fec);
+    // print(" airpdu: "), printDec(test_size);
+    // print("bytes  ");//, hbytes(test_pdu, min(40,test_size));
     set_value(FEC_Mode, fec);
     encode_airpdu(test_pdu, test_size);
 }
@@ -159,19 +159,19 @@ void continue_test() {
     memset(bits, 0, sizeof(bits));
     afe->bits = bits;
     Short fbits = frame_bits(afe->bytes, afe->nbits, afe->bits);
-    print(" frame_bits: "), printDec(fbits); // nbits is number of sequences
+    // print(" frame_bits: "), printDec(fbits); // nbits is number of sequences
     
-    print("\n Encoded: "), printDec(afe->nbytes), print("bytes  "), hbytes(afe->bytes, min(30, afe->nbytes));
-    print("\n  As bit sequences: "), printDec(afe->nbits), print("bits  "), hbytes(afe->bits, min(30, afe->nbits));
-    print("\nDecoding: ");
-    Short b;
-    printDec((b = count_bits(afe->bits, fbits))), print("bits  ");
-    printDec(b/8), print("bytes");
+    // print("\n Encoded: "), printDec(afe->nbytes), print("bytes  ");//, hbytes(afe->bytes, min(30, afe->nbytes));
+    // print("\n  As bit sequences: "), printDec(afe->nbits), print("bits  "), hbytes(afe->bits, min(30, afe->nbits));
+    // print("\nDecoding: ");
+    // Short b;
+    // printDec((b = count_bits(afe->bits, fbits))), print("bits  ");
+    // printDec(b/8), print("bytes");
 
-    print("\n Find bit sync:");
+    // print("\n Find bit sync:");
     AirFrame afd = {.bits = afe->bits, .nbits = fbits};
     Long offset = find_bit_sync(afd.bits - 1);
-    print(" offset = "), printDec(offset);
+    // print(" offset = "), printDec(offset);
     if (offset >= afd.nbits) {
         print("  No bit sync match ");
         return;
@@ -184,45 +184,46 @@ void continue_test() {
     afd.bytes = bytes;
     afd.nbytes = bits_to_bytes(afd.bits, afd.bytes, afd.nbits);
 
-    print("\n Bits to Bytes: "); 
-    printDec(afd.nbytes), print("bytes "); hbytes(afd.bytes, min(40, afd.nbytes));
+    // print("\n Bits to Bytes: "); 
+    // printDec(afd.nbytes), print("bytes "); hbytes(afd.bytes, min(40, afd.nbytes));
  
     Byte fecmode = find_frame_sync(afd.bytes + BSYNC_SIZE);
-    print("\n FEC mode: ");
-    printDec(fecmode);
+    // print("\n FEC mode: ");
+    // printDec(fecmode);
     if (fecmode > 2) { print("\n Cannot decode further! Bad FEC mode!"); return; }
 
 
-    print("\n Split into segments: ");
+    // print("\n Split into segments: ");
     afd.nrs = fecmode == 0 ? FEC0_NROOTS : FEC12_NROOTS; // nroots
     afd.seg1 = afd.bytes + SYNC_SIZE;
     afd.nseg1 = fecmode == 0 ? SEG10_SIZE : fecmode == 1 ? SEG11_SIZE : SEG12_SIZE;
     afd.nseg2 = afd.nbytes - SYNC_SIZE > afd.nseg1 ? afd.nbytes - SYNC_SIZE - afd.nseg1 : 0;
     Byte seg2[afd.nseg2 ? afd.nseg2 : 1];
     afd.seg2 = afd.nseg2 ? afd.seg1 + afd.nseg1 : NULL;
-    printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
-    printDec(afd.nseg1 + afd.nseg2), print("bytes  ");
-    switch(fecmode) {
-    case 0: if (afd.nseg1 != SEG10_SIZE) print(" Segment Wrong size"); printDec(SEG10_SIZE),printDec(afd.nseg1); break;
-    case 1: if (afd.nseg1 != SEG11_SIZE) print(" Segment Wrong size"); printDec(SEG11_SIZE),printDec(afd.nseg1); break;
-    case 2: if (afd.nseg1 != SEG12_SIZE) print(" Segment Wrong size"); printDec(SEG12_SIZE),printDec(afd.nseg1); break;
-    }
+    // printDec((afd.seg1 != NULL) + (afd.seg2 != NULL));
+    // printDec(afd.nseg1 + afd.nseg2), print("bytes  ");
+    // switch(fecmode) {
+    // case 0: if (afd.nseg1 != SEG10_SIZE) print(" Segment Wrong size"); printDec(SEG10_SIZE),printDec(afd.nseg1); break;
+    // case 1: if (afd.nseg1 != SEG11_SIZE) print(" Segment Wrong size"); printDec(SEG11_SIZE),printDec(afd.nseg1); break;
+    // case 2: if (afd.nseg1 != SEG12_SIZE) print(" Segment Wrong size"); printDec(SEG12_SIZE),printDec(afd.nseg1); break;
+    // }
 
-    print("\n Deconvolve segment 1: "); // nseg1 length is for data only
+    // print("\n Deconvolve segment 1: "); // nseg1 length is for data only
     Byte seg1[afd.nseg1];
-    printDec(afd.nseg1), print("bytes  ");
-print("\n predeconvolve: "),printDec(afd.nseg1),hbytes(afd.seg1, afd.nseg1), print("  ");
+    // printDec(afd.nseg1), print("bytes  ");
+// print("\n predeconvolve: "),printDec(afd.nseg1),hbytes(afd.seg1, afd.nseg1), print("  ");
     int n = deconvolve_buffer(afd.seg1, seg1, afd.nseg1*8) - afd.nrs;
     if (n < 0) { print("\n Faild deconvolving"); return; }
     afd.nseg1 = n;
     // print("  NSEG1 = "), printDec(afd.nseg1);
-    print("\n  Decode errors in block 1: ");
-hbytes(seg1, n + afd.nrs), print("  ");
-    printDec(decode_rs(seg1, afd.nseg1));
+    // print("\n  Decode errors in block 1: ");
+// hbytes(seg1, n + afd.nrs), print("  ");
+    // printDec()
+    decode_rs(seg1, afd.nseg1);
 
-    print("\n  Descramble block 1: ");
+    // print("\n  Descramble block 1: ");
     unscramble_blk(seg1, afd.nseg1);
-    hbytes(seg1, min(40,afd.nseg1));
+    // hbytes(seg1, min(40,afd.nseg1));
 
     // Assemble block 1
     Short len = seg1[0] << 8 | seg1[1];
@@ -232,8 +233,8 @@ hbytes(seg1, n + afd.nrs), print("  ");
     memcpy(airpdu, seg1 + 2, nseg1);
 
     if (afd.nseg2) {
-        print("\n Deconvolve segment 2: ");
-        printDec(afd.nseg2), print("bytes  ");
+        // print("\n Deconvolve segment 2: ");
+        // printDec(afd.nseg2), print("bytes  ");
         bool valid = true;
         switch(fecmode) {
         case 0:  valid = afd.nseg2 >= MIN_SEG10_SIZE && afd.nseg2 < 10000; break;
@@ -241,7 +242,7 @@ hbytes(seg1, n + afd.nrs), print("  ");
         case 2:  valid = afd.nseg2 >= MIN_SEG12_SIZE && afd.nseg2 < 10000; break;
         }
         if (valid) {
-            print("\n  Decode errors in blocks: ");
+            // print("\n  Decode errors in blocks: ");
             n = deconvolve_buffer(afd.seg2, seg2, afd.nseg2*8);
             if (n < 0) { print("\n Faild deconvolving"); return; }
             afd.nseg2 = n;
@@ -250,7 +251,8 @@ hbytes(seg1, n + afd.nrs), print("  ");
             for (Short s = 0, d = 0; s < afd.nseg2; s += rsblock, d += blockm) {
                 int n = min(rsblock, afd.nseg2 - s) - afd.nrs;
                 if (n > 0) {
-                    printDec(decode_rs(seg2 + s, n));
+                    // printDec()
+                        decode_rs(seg2 + s, n);
                     unscramble_blk(seg2 + s, n);
                     memcpy(airpdu + nseg1 + d, seg2 + s, n);
                 } else
@@ -260,11 +262,11 @@ hbytes(seg1, n + afd.nrs), print("  ");
             print(" Segment Wrong size! ");
     }
 
-    print("\n Assemble blocks: ");
-    print("\n airpdu:  ");
-    printDec(len), print("bytes  "), hbytes(airpdu, min(40, len));
+    // print("\n Assemble blocks: ");
+    // print("\n airpdu:  ");
+    // printDec(len), print("bytes  "), hbytes(airpdu, min(40, len));
     if (len == test_size && memcmp(airpdu, test_pdu, test_size) == 0)
-        success++, print("  Matched ");
+        success++ /*, print("  Matched ")*/;
     else {
         print("  Different! ");
         for (Short i = 0; i < test_size; i++)
@@ -273,7 +275,7 @@ hbytes(seg1, n + afd.nrs), print("  ");
                 break;
             }
     }
-    printCr();
+    // printCr();
 
     finish_test();
 }
