@@ -31,6 +31,7 @@
     ../AL200_Platforms/AL200_OS6/Alert2Encoder/src/Time/utc.c \
     ../AL200_Platforms/AL200_OSX/Decoders/deconvolve.c \
     ../AL200_Platforms/AL200_OSX/Decoders/zero_crossings.c \
+    ../AL200_Platforms/AL200_OSX/Decoders/decode.c \
     parameters.c \
     tea.c \
     main.c \

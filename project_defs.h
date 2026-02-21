@@ -12,6 +12,10 @@
 Long get_ticks();
 #define gps_data() true
 #define devconfig_connected() false
+
+int fec_debug(); // debug: 1 - print partial bits
+#define FEC_DEBUG 0
+
 // #define namedAction(action) 
 
 #define sysTicks() clock()
