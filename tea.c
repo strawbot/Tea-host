@@ -2,6 +2,7 @@
 #include "tea.h"
 #include "printers.h"
 #include "queue.c"
+#include "timeout.h"
 #include <stdio.h>
 #include <time.h>
 
