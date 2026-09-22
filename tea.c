@@ -9,6 +9,14 @@
 static QUEUE(10, afterq); // {due, action}*
 static QUEUE(5, laterq); // {action}*
 
+// Lets a driving loop (see AutomatedTest/tools/tea_host_cli/main.c) know
+// when it has genuinely caught up rather than guessing at a fixed
+// action_slice() iteration count - cli()'s later(cli) self-requeuing
+// chain for one input line can take a variable number of generations to
+// finish, and guessing too low let one command's echo spill into the
+// next command's response window when fed back to back with no delay.
+bool pending_actions(void) { return queryq(laterq) != 0; }
+
 static bool debug = false;
 
 static ms_time origin;
@@ -161,7 +169,9 @@ void actor(vector action, const char * name) { }
 
 void actionRun(vector action) { action(); }
 
-Cell ret() { return 0; }
-void lit(Cell n) { }
+// ret()/lit() removed: they were unused stubs here, and cli.c provides
+// the real data-stack pop()/push() versions of these - keeping both
+// would be a duplicate-symbol link error the moment cli.c joins the
+// build (see AutomatedTest/tools/tea_host_cli).
 
 void init_tll() { }
